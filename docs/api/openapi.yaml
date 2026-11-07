@@ -1,0 +1,743 @@
+openapi: 3.1.0
+info:
+  title: Quay logistics API
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+  summary: Inventory reservations, delivery state, and bounded device scan events.
+  description: |
+    Contract for the shipped `/api/v1` slice and the OAuth2 client-credentials token endpoint.
+    The warehouse HTML UI is not part of this contract. Driver and PDA clients are not shipped
+    as applications; they call these operations with the scopes named here.
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+servers:
+  - url: /
+security:
+  - oauth2: []
+tags:
+  - name: Auth
+    description: OAuth2 client-credentials tokens.
+  - name: Inventory
+    description: Stock balances, receipts, and reservations.
+  - name: Delivery
+    description: Delivery stop state.
+  - name: Telemetry
+    description: Bounded device scan events.
+  - name: Operations
+    description: Process readiness.
+paths:
+  /oauth/token:
+    post:
+      tags: [Auth]
+      operationId: issueClientCredentialsToken
+      security: []
+      summary: Issue a client-credentials access token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type:
+                  const: client_credentials
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                scope:
+                  type: string
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Client authentication failed. Passport returns an OAuth2 error body, not problem+json.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                required: [error]
+                properties:
+                  error:
+                    type: string
+  /ready:
+    get:
+      tags: [Operations]
+      operationId: readiness
+      security: []
+      summary: Readiness of MySQL, both Redis processes, and MongoDB
+      responses:
+        '200':
+          description: Dependencies answered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        '503':
+          description: A dependency did not answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+  /api/v1/stock-balances:
+    get:
+      tags: [Inventory]
+      operationId: listStockBalances
+      security:
+        - oauth2: [inventory.read]
+      summary: List stock balances
+      responses:
+        '200':
+          description: Balances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceList'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/receipts:
+    post:
+      tags: [Inventory]
+      operationId: receiveStock
+      security:
+        - oauth2: [inventory.write]
+      summary: Receive stock into a location
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptRequest'
+      responses:
+        '201':
+          description: Receipt posted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptResult'
+        '200':
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/reservations:
+    post:
+      tags: [Inventory]
+      operationId: holdReservation
+      security:
+        - oauth2: [inventory.write]
+      summary: Hold available stock for a delivery reference
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationRequest'
+      responses:
+        '201':
+          description: Reservation held
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResult'
+        '200':
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/reservations/{reservation}:
+    get:
+      tags: [Inventory]
+      operationId: showReservation
+      summary: Read one reservation
+      security:
+        - oauth2: [inventory.read]
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+      responses:
+        '200':
+          description: Reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationEnvelope'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/reservations/{reservation}/release:
+    post:
+      tags: [Inventory]
+      operationId: releaseReservation
+      summary: Release a held reservation
+      security:
+        - oauth2: [inventory.write]
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Reservation released or already released
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResult'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/delivery-stops:
+    get:
+      tags: [Delivery]
+      operationId: listDeliveryStops
+      summary: List delivery stops
+      security:
+        - oauth2: [delivery.read]
+      responses:
+        '200':
+          description: Stops
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StopList'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/delivery-stops/{stop}:
+    get:
+      tags: [Delivery]
+      operationId: showDeliveryStop
+      summary: Read one delivery stop
+      security:
+        - oauth2: [delivery.read]
+      parameters:
+        - $ref: '#/components/parameters/StopId'
+      responses:
+        '200':
+          description: Stop
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StopEnvelope'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/delivery-stops/{stop}/transitions:
+    post:
+      tags: [Delivery]
+      operationId: transitionDeliveryStop
+      summary: Move a delivery stop to the next status
+      security:
+        - oauth2: [delivery.write]
+      parameters:
+        - $ref: '#/components/parameters/StopId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionRequest'
+      responses:
+        '200':
+          description: Status changed or replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StopResult'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/scan-events:
+    get:
+      tags: [Telemetry]
+      operationId: listScanEvents
+      summary: List recent scan events
+      security:
+        - oauth2: [telemetry.write]
+      responses:
+        '200':
+          description: Recent scan events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanList'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [Telemetry]
+      operationId: recordScanEvent
+      summary: Record a bounded scan event
+      security:
+        - oauth2: [telemetry.write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '201':
+          description: Scan stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResult'
+        '200':
+          description: Duplicate event id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResult'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/scan-events/{eventId}:
+    get:
+      tags: [Telemetry]
+      operationId: showScanEvent
+      summary: Read one scan event
+      security:
+        - oauth2: [telemetry.write]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Scan event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanEnvelope'
+        '404':
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: /oauth/token
+          scopes:
+            inventory.read: Read stock balances and reservations
+            inventory.write: Receive stock and hold or release reservations
+            delivery.read: Read delivery stop state
+            delivery.write: Change delivery stop state
+            telemetry.write: Record and read bounded device scan events
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReservationId:
+      name: reservation
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StopId:
+      name: stop
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Problem:
+      description: Problem details
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, instance, request_id]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        request_id:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    TokenResponse:
+      type: object
+      additionalProperties: true
+      required: [token_type, expires_in, access_token]
+      properties:
+        token_type:
+          const: Bearer
+        expires_in:
+          type: integer
+        access_token:
+          type: string
+        scope:
+          type: string
+    Readiness:
+      type: object
+      additionalProperties: false
+      required: [status, checks]
+      properties:
+        status:
+          enum: [ready, unavailable]
+        checks:
+          type: object
+          additionalProperties: false
+          required: [mysql, redis_cache, redis_queue, mongodb]
+          properties:
+            mysql:
+              type: boolean
+            redis_cache:
+              type: boolean
+            redis_queue:
+              type: boolean
+            mongodb:
+              type: boolean
+    Balance:
+      type: object
+      additionalProperties: false
+      required: [sku_code, location_code, on_hand, reserved, available, version]
+      properties:
+        sku_code:
+          type: string
+        location_code:
+          type: string
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        available:
+          type: integer
+        version:
+          type: integer
+    BalanceList:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Balance'
+        meta:
+          type: object
+          additionalProperties: false
+          required: [limit]
+          properties:
+            limit:
+              type: integer
+    ReceiptRequest:
+      type: object
+      additionalProperties: false
+      required: [sku_code, location_code, quantity]
+      properties:
+        sku_code:
+          type: string
+        location_code:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100000
+    ReceiptResult:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: '#/components/schemas/Balance'
+        meta:
+          $ref: '#/components/schemas/ReplayMeta'
+    ReservationRequest:
+      type: object
+      additionalProperties: false
+      required: [sku_code, location_code, quantity, reference, warehouse_code]
+      properties:
+        sku_code:
+          type: string
+        location_code:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        reference:
+          type: string
+        warehouse_code:
+          type: string
+    Reservation:
+      type: object
+      additionalProperties: false
+      required: [id, sku_code, location_code, quantity, status, reference, warehouse_code, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku_code:
+          type: string
+        location_code:
+          type: string
+        quantity:
+          type: integer
+        status:
+          enum: [held, released, consumed]
+        reference:
+          type: string
+        warehouse_code:
+          type: string
+        version:
+          type: integer
+    ReservationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Reservation'
+    ReservationResult:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: '#/components/schemas/Reservation'
+        meta:
+          $ref: '#/components/schemas/ReplayMeta'
+    ReplayMeta:
+      type: object
+      additionalProperties: false
+      required: [replayed]
+      properties:
+        replayed:
+          type: boolean
+    Stop:
+      type: object
+      additionalProperties: false
+      required: [id, reference, reservation_id, warehouse_code, sku_code, quantity, status, version, allowed_transitions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        reservation_id:
+          type: [string, 'null']
+        warehouse_code:
+          type: string
+        sku_code:
+          type: string
+        quantity:
+          type: integer
+        status:
+          enum: [planned, dispatched, in_transit, delivered, failed, cancelled]
+        version:
+          type: integer
+        allowed_transitions:
+          type: array
+          items:
+            type: string
+    StopList:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stop'
+        meta:
+          type: object
+          additionalProperties: false
+          required: [limit]
+          properties:
+            limit:
+              type: integer
+    StopEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Stop'
+    StopResult:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: '#/components/schemas/Stop'
+        meta:
+          $ref: '#/components/schemas/ReplayMeta'
+    TransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          enum: [planned, dispatched, in_transit, delivered, failed, cancelled]
+    ScanRequest:
+      type: object
+      additionalProperties: false
+      required: [event_id, device_id, symbology, payload, recorded_at]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          maxLength: 64
+        symbology:
+          type: string
+          maxLength: 32
+        payload:
+          type: string
+          maxLength: 512
+        warehouse_code:
+          type: [string, 'null']
+        recorded_at:
+          type: string
+          format: date-time
+        device:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            model:
+              type: string
+            firmware:
+              type: string
+    ScanEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, device_id, symbology, payload, warehouse_code, recorded_at, device]
+      properties:
+        event_id:
+          type: string
+        device_id:
+          type: string
+        symbology:
+          type: string
+        payload:
+          type: string
+        warehouse_code:
+          type: [string, 'null']
+        recorded_at:
+          type: string
+          format: date-time
+        device:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            model:
+              type: string
+            firmware:
+              type: string
+    ScanEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/ScanEvent'
+    ScanResult:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: '#/components/schemas/ScanEvent'
+        meta:
+          $ref: '#/components/schemas/ReplayMeta'
+    ScanList:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanEvent'
+        meta:
+          type: object
+          additionalProperties: false
+          required: [limit]
+          properties:
+            limit:
+              type: integer

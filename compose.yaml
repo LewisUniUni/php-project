@@ -1,0 +1,165 @@
+name: quay
+
+x-app: &app
+  build:
+    context: .
+  image: quay-platform:local
+  env_file:
+    - .env
+  init: true
+  stop_grace_period: 70s
+  volumes:
+    - app-storage:/app/storage
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis-cache:
+      condition: service_healthy
+    redis-queue:
+      condition: service_healthy
+    mongodb:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4.13@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+    environment:
+      MYSQL_ROOT_PASSWORD: local-root-password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-plocal-root-password"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis-cache:
+    image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-queue:
+    image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+    command: ["redis-server", "--save", "", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis-queue-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mongodb:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    <<: *app
+    environment:
+      DB_HOST: mysql
+      DB_USERNAME: logistics_app
+      DB_PASSWORD: local-app-password
+      DB_DATABASE: logistics
+      REDIS_CACHE_HOST: redis-cache
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: redis-queue
+      REDIS_QUEUE_PORT: "6379"
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: logistics
+      OCTANE_SERVER: frankenphp
+    ports:
+      - "127.0.0.1:8411:8000"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/up') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  worker:
+    <<: *app
+    command: ["php", "artisan", "horizon"]
+    environment:
+      DB_HOST: mysql
+      DB_USERNAME: logistics_app
+      DB_PASSWORD: local-app-password
+      DB_DATABASE: logistics
+      REDIS_CACHE_HOST: redis-cache
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: redis-queue
+      REDIS_QUEUE_PORT: "6379"
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: logistics
+    healthcheck:
+      test: ["CMD", "php", "artisan", "horizon:status"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 25s
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      DB_HOST: mysql
+      DB_USERNAME: logistics_app
+      DB_PASSWORD: local-app-password
+      DB_DATABASE: logistics
+      REDIS_CACHE_HOST: redis-cache
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: redis-queue
+      REDIS_QUEUE_PORT: "6379"
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: logistics
+    healthcheck:
+      test: ["CMD", "php", "artisan", "ops:heartbeat-status"]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 90s
+
+  migrate:
+    <<: *app
+    profiles: ["migrate"]
+    restart: "no"
+    command: ["php", "artisan", "migrate", "--force", "--isolated"]
+    environment:
+      DB_HOST: mysql
+      DB_USERNAME: logistics_migrator
+      DB_PASSWORD: local-migrator-password
+      DB_DATABASE: logistics
+      REDIS_CACHE_HOST: redis-cache
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: redis-queue
+      REDIS_QUEUE_PORT: "6379"
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: logistics
+
+volumes:
+  mysql-data:
+  mongo-data:
+  redis-queue-data:
+  app-storage:

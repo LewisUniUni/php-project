@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
+use Laravel\Passport\Client;
+use Laravel\Passport\ClientRepository;
+use Laravel\Passport\Passport;
+
+abstract class TestCase extends BaseTestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (! is_file(storage_path('oauth-private.key')) || ! is_file(storage_path('oauth-public.key'))) {
+            $this->artisan('passport:keys', ['--force' => true]);
+        }
+
+        foreach (['default', 'cache'] as $connection) {
+            Redis::connection($connection)->flushdb();
+        }
+
+        DB::connection('mongodb')->getDatabase()->selectCollection('scan_events')->deleteMany([]);
+    }
+
+    /**
+     * @param  list<string>  $scopes
+     */
+    protected function client(array $scopes, string $name = 'warehouse-api'): Client
+    {
+        $client = app(ClientRepository::class)->createClientCredentialsGrantClient($name);
+        $client->scopes = $scopes;
+        $client->save();
+
+        return $client;
+    }
+
+    /**
+     * @param  list<string>  $scopes
+     */
+    protected function actAsClient(array $scopes, string $name = 'warehouse-api'): Client
+    {
+        $client = $this->client($scopes, $name);
+        Passport::actingAsClient($client, $scopes);
+
+        return $client;
+    }
+}

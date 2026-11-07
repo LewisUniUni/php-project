@@ -1,0 +1,25 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+    - vendor/phpat/phpat/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - app
+        - tests/Architecture
+    tmpDir: storage/phpstan
+    treatPhpDocTypesAsCertain: true
+    # Eloquent and the Redis connection expose query commands through __call.
+    # Larastan still types the models. This strict-rules identifier only
+    # reports that dynamic dispatch, so it is excluded.
+    ignoreErrors:
+        -
+            identifier: staticMethod.dynamicCall
+
+services:
+    -
+        class: Tests\Architecture\ModuleBoundaries
+        tags:
+            - phpat.test

@@ -1,0 +1,5 @@
+extends:
+  - recommended
+rules:
+  # Liveness and readiness are probes, not client operations that return 4xx.
+  operation-4xx-response: warn
