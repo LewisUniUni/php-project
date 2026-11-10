@@ -315,6 +315,60 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.4.13@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+        env:
+          MYSQL_ROOT_PASSWORD: local-root-password
+          MYSQL_DATABASE: logistics_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -plocal-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      redis-cache:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      redis-queue:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      mongodb:
+        image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_DATABASE: logistics_test
+      DB_USERNAME: root
+      DB_PASSWORD: local-root-password
+      REDIS_CACHE_HOST: 127.0.0.1
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: 127.0.0.1
+      REDIS_QUEUE_PORT: "6380"
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_DATABASE: logistics_test
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -348,12 +402,16 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk code test --severity-threshold=high
 
+      - name: Build runtime image
+        run: docker build -t quay-platform:ci .
+
+      - name: Verify FrankenPHP image
+        run: sh tools/frankenphp/verify-image.sh quay-platform:ci
+
       - name: Snyk Container
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker build -t quay-platform:ci .
-          snyk container test quay-platform:ci --file=Dockerfile --severity-threshold=high
+        run: snyk container test quay-platform:ci --file=Dockerfile --severity-threshold=high
 
       - name: Snyk IaC
         env:

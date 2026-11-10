@@ -296,6 +296,14 @@ These checks are in addition to the full Pint, PHPStan, Composer audit, and Snyk
 
 `AGENTS.md` still contains the generated Laravel Boost guidelines, and `CLAUDE.md` imports that file. How to keep a short tool-neutral file when `boost:install` rewrites both is unresolved. The approved workflow section was appended. Boost was not re-run.
 
+## FrankenPHP binary
+
+The runtime base remains `dunglas/frankenphp:1.13.5-php8.5.12-trixie` digest `sha256:7e73a27eb7712a5b4073b92f8f0dec91e9400138604b76cc791589faaa6a639c`. That official image already contains PHP 8.5.12. PHP 8.5.12 fixes PHP2Shell. FrankenPHP 1.13.5 fixes FrankenPHP and Caddy advisories. Neither release removes the Debian package highs or the unfixed `go-jose` v3 module.
+
+The binary copied into that image is built from the builder image of the same tag, whose source checkout is commit `a3663e9e2cc4c258018a28ee068e50cc12f3ed2d`. `docker/frankenphp/go.mod` pins `github.com/smallstep/certificates` to `v0.30.3-0.20261105204752-cddde30af36e`, which is commit `cddde30af36e238f156bb557bfd1f11a05ffe6f9`. That upstream commit moves `go.step.sm/crypto` onto go-jose v4. There is no `replace` of go-jose v3. `go.sum` is committed. The module does not list go-jose v3.
+
+This repository maintains that pin until smallstep tags a release containing `cddde30`. Then the pin should move to the tag. When an official FrankenPHP image's binary no longer contains go-jose v3, delete the `frankenphp-bin` stage and `docker/frankenphp` and return to the official binary. Debian packages stay in the image because PHP curl and XML are linked to them. The 16 Debian highs remain visible and still fail `snyk container test --severity-threshold=high`.
+
 ## Questions
 
 1. What changed-code coverage floor should fail CI? This diff is 84.21% of changed executable statements (16/19). The combined rate over all of `app/` is 71.75% (851/1186). The unit-only rate on that same denominator is 3.79% (45/1186).
