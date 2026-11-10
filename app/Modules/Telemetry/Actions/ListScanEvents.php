@@ -6,6 +6,7 @@ namespace App\Modules\Telemetry\Actions;
 
 use App\Modules\Telemetry\Data\ScanEventView;
 use App\Modules\Telemetry\Documents\ScanEvent;
+use App\Support\Database\ReadCap;
 
 final class ListScanEvents
 {
@@ -14,7 +15,9 @@ final class ListScanEvents
      */
     public function execute(int $limit = 50): array
     {
-        return ScanEvent::query()
+        ReadCap::assertFetchSize($limit);
+
+        return ScanEvent::query()->select(ScanEvent::readColumns())
             ->orderByDesc('recorded_at')
             ->limit($limit)
             ->get()

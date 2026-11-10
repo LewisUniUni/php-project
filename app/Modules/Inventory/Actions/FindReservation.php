@@ -12,7 +12,7 @@ final class FindReservation
 {
     public function execute(string $id): ReservationView
     {
-        $reservation = Reservation::query()->find($id);
+        $reservation = Reservation::query()->select(Reservation::readColumns())->find($id);
 
         if ($reservation === null) {
             throw new ReservationNotFound($id);

@@ -7,6 +7,7 @@ namespace App\Modules\Outbox\Commands;
 use App\Modules\Outbox\Enums\OutboxStatus;
 use App\Modules\Outbox\Jobs\DeliverOutboxMessage;
 use App\Modules\Outbox\Models\OutboxMessage;
+use App\Support\Database\ReadCap;
 use App\Support\Values\ConfiguredInt;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,10 @@ final class RelayOutbox extends Command
     public function handle(): int
     {
         $ids = DB::transaction(function (): array {
-            $messages = OutboxMessage::query()
+            $batch = ConfiguredInt::get('operations.outbox_batch', 50);
+            ReadCap::assertFetchSize($batch);
+
+            $messages = OutboxMessage::query()->select(OutboxMessage::readColumns())
                 ->where(function ($query): void {
                     $query->where('status', OutboxStatus::Pending)
                         ->orWhere(function ($query): void {
@@ -31,7 +35,7 @@ final class RelayOutbox extends Command
                         });
                 })
                 ->orderBy('created_at')
-                ->limit(ConfiguredInt::get('operations.outbox_batch', 50))
+                ->limit($batch)
                 ->lock('FOR UPDATE SKIP LOCKED')
                 ->get();
 

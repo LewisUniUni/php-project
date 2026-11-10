@@ -27,13 +27,14 @@ final class AssignCorrelationId
             $requestId = (string) Str::uuid();
         }
 
-        $traceId = $this->traceId($request->headers->get('traceparent'));
+        [$traceId, $spanId] = $this->traceAndSpan($request->headers->get('traceparent'));
         $actor = $this->actors->fromRequest($request);
         $warehouse = $request->headers->get('X-Warehouse-Code');
 
         $this->correlation->replace(
             requestId: $requestId,
             traceId: $traceId,
+            spanId: $spanId,
             clientId: $actor->type === 'client' ? $actor->id : null,
             warehouseId: is_string($warehouse) && $warehouse !== '' ? $warehouse : null,
         );
@@ -49,12 +50,15 @@ final class AssignCorrelationId
         return $response;
     }
 
-    private function traceId(?string $traceparent): string
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function traceAndSpan(?string $traceparent): array
     {
-        if (is_string($traceparent) && preg_match('/^00-([a-f0-9]{32})-[a-f0-9]{16}-[a-f0-9]{2}$/', $traceparent, $matches) === 1) {
-            return $matches[1];
+        if (is_string($traceparent) && preg_match('/^00-([a-f0-9]{32})-([a-f0-9]{16})-[a-f0-9]{2}$/', $traceparent, $matches) === 1) {
+            return [$matches[1], $matches[2]];
         }
 
-        return bin2hex(random_bytes(16));
+        return [bin2hex(random_bytes(16)), bin2hex(random_bytes(8))];
     }
 }

@@ -11,7 +11,7 @@ final class RegisterLocation
 {
     public function execute(string $code, string $name, string $zone): LocationRef
     {
-        $location = Location::query()->firstOrCreate(
+        $location = Location::query()->select(Location::readColumns())->firstOrCreate(
             ['code' => $code],
             ['name' => $name, 'zone' => $zone],
         );

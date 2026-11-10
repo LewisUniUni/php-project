@@ -38,7 +38,7 @@ final class ReserveStock
         Actor $actor,
     ): ReservationView {
         return DB::transaction(function () use ($skuCode, $locationCode, $quantity, $reference, $warehouseCode, $idempotencyKey, $actor): ReservationView {
-            $existing = Reservation::query()->where('idempotency_key', $idempotencyKey)->first();
+            $existing = Reservation::query()->select(Reservation::readColumns())->where('idempotency_key', $idempotencyKey)->first();
 
             if ($existing !== null) {
                 return $this->view($existing, true);

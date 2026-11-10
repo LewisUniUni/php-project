@@ -1,31 +1,17 @@
-# Proposed only. This file is not loaded by CI, Semgrep, PHPStan, or PHPUnit.
-#
-# A 100-row cap was requested. The scope was not decided: every read, or only
-# API list responses. Do not turn this file into a failing check until that
-# choice is explicit.
-#
-# These shapes are not violations of a row cap, whichever scope is chosen:
-# - COUNT(*) and other aggregates
-# - pagination count queries
-# - Eloquent relationship hydration
-# - framework and package internals
-# - bounded batch jobs, including the outbox relay (operations.outbox_batch, default 50)
-#
-# tests/Unit/ApiListLimitTest.php only characterizes the three API list actions
-# that already default to 100. It is not a universal read policy and it does
-# not grant exemptions for other queries.
-
-status: proposed
-undecided_scope:
-  - universal-read
-  - api-list-only
-existing_api_list_defaults:
-  - class: App\Modules\Delivery\Actions\ListStops
-    default_limit: 100
-  - class: App\Modules\Inventory\Actions\ListBalances
-    default_limit: 100
-  - class: App\Modules\Telemetry\Actions\ListScanEvents
-    default_limit: 50
-not_covered_by_phpstan_dba:
-  - eloquent
-  - illuminate-query-builder
+# The application-read decision is implemented in App\Support\Database\ReadCap.
+# This file is not loaded by CI. It lists package operations that the guard does
+# not see. They are not approved exemptions and there is no SQL allowlist.
+status: decision-applied-for-application-origin-reads
+max_result_rows: 100
+enforced:
+  - application-origin mysql select
+  - scan-event mongodb collection fetch
+not_a_database_read:
+  - redis
+  - filesystem
+  - mongodb ping command
+proposed_exceptions_not_enabled:
+  - eloquent-user-provider-login
+  - passport-oauth-client-and-token-hydration
+  - migrator-and-schema-metadata
+  - database-session-or-database-cache-if-those-drivers-are-selected

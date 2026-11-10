@@ -6,13 +6,17 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Modules\Identity\Role;
+use App\Support\Database\ReadCap;
 use App\Support\Runtime\CorrelationContext;
+use App\Support\Telemetry\OtlpExport;
 use App\Support\Values\ConfiguredInt;
 use App\Support\Values\Identifier;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -31,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::shouldBeStrict(! $this->app->isProduction());
+        OtlpExport::boot();
+        $this->guardApplicationReads();
 
         $scopes = config('identity.scopes');
         if (is_array($scopes)) {
@@ -91,6 +97,33 @@ class AppServiceProvider extends ServiceProvider
                 'sql' => $event->sql,
             ]);
         });
+    }
 
+    private function guardApplicationReads(): void
+    {
+        $armed = [];
+
+        Event::listen(function (ConnectionEstablished $event) use (&$armed): void {
+            $connection = $event->connection;
+            $id = spl_object_id($connection);
+
+            if (isset($armed[$id])) {
+                return;
+            }
+
+            $armed[$id] = true;
+
+            if ($connection->getDriverName() === 'mongodb') {
+                return;
+            }
+
+            $connection->beforeExecuting(function (string $query, array $bindings): void {
+                if (! ReadCap::originatesInApplication()) {
+                    return;
+                }
+
+                ReadCap::assertSql($query, $bindings);
+            });
+        });
     }
 }

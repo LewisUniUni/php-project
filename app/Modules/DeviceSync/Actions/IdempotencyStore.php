@@ -13,7 +13,7 @@ final class IdempotencyStore
 {
     public function findReplay(string $actor, string $key, string $requestHash): ?Response
     {
-        $existing = HttpIdempotencyKey::query()
+        $existing = HttpIdempotencyKey::query()->select(HttpIdempotencyKey::readColumns())
             ->where('actor', $actor)
             ->where('idempotency_key', $key)
             ->first();

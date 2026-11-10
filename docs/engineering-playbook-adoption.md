@@ -130,7 +130,7 @@ The max-level fixes included a real logging bug: `config/logging.php` defined `s
 | `phpstan-dba` | Deferred | Not installed. `staabm/phpstan-dba` 0.5.4 documents built-in support for Doctrine DBAL, mysqli, and PDO. Laravel raw-query support is still the open issue 392. A green run over this Eloquent codebase would not analyze the query builder |
 | CI MySQL plus schema-aware `phpstan-dba` | Deferred | Same coverage gap. MySQL is already started for tests |
 | Ban concatenated SQL and raw calls outside a repository | Implemented for the raw APIs | `app/` has no `DB::raw`, `DB::select`, `whereRaw`, `selectRaw`, or the other listed raw methods. This project has no repository layer. Actions use the query builder and Eloquent. The test is a textual ban. It does not prove dynamic SQL safe |
-| Queries return at most 100 rows | Conflict | The scope was not chosen: every read, or API lists only. `tools/sql/row-cap.proposed.yml` is not loaded by CI. `ApiListLimitTest` only records the current defaults: delivery stops 100, balances 100, scan events 50. The outbox relay defaults to 50. `COUNT(*)`, aggregates, pagination counts, relationship hydration, framework internals, and bounded batch jobs are not treated as violations or exemptions, because no rule was turned on |
+| Queries return at most 100 rows | Implemented for application-origin reads | The scope decision is every application database read. `ReadCap` fails the query. It does not add a LIMIT. Ordinary callers name columns and fetch at most 100 rows. See the read-cap section below. Unapproved package reads are listed and are not an allowlist |
 
 ### Tests (slides 9–10)
 
@@ -168,7 +168,7 @@ The max-level fixes included a real logging bug: `config/logging.php` defined `s
 | PMM Query Analytics | Deferred | Not part of this draft |
 | Blackfire | Deferred | Paid, and not an established service for this repository |
 | k6 | Deferred | No load target was defined. A script that never runs would not be a test |
-| OpenTelemetry to SigNoz | Deferred | Logs already carry a trace id. No exporter is installed. SigNoz is not a running dependency of this repository |
+| OpenTelemetry, visualized in Grafana | Partial | The confirmed stack is OpenTelemetry plus Grafana. SigNoz is not the target. Implemented today: JSON stderr logs, secret redaction, and `trace_id` / `span_id` correlation on web, the outbox consumer, and the scheduler heartbeat. OTLP export is off unless `TELEMETRY_EXPORT=true` and `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Tests force export off. The PHP SDK and auto-instrumentation are not installed. Grafana is not an OTLP receiver; no Loki, Tempo, Mimir, Alloy, or Grafana Cloud address is configured |
 | Feature flags and canary releases | Deferred | No flag service or production orchestrator is chosen |
 
 ### AI workflow (slide 13)
@@ -226,7 +226,7 @@ Confirm that this account should be the owner before that file exists. Without b
 | Secrets | gitleaks | gitleaks |
 | Profiling | Blackfire | Deferred |
 | Load | k6 | Deferred |
-| Telemetry | OpenTelemetry to SigNoz | Log correlation only |
+| Telemetry | OpenTelemetry, Grafana for visualization | Log correlation is implemented. OTLP export is opt-in and has no collector endpoint yet |
 | Code health | PhpMetrics | PHPMD ceilings; PhpMetrics deferred |
 | Agent file | `AGENTS.md` | `AGENTS.md` |
 
@@ -237,11 +237,39 @@ Confirm that this account should be the owner before that file exists. Without b
 | Turn tools on with `continue-on-error`, then ratchet | Conflict | Existing jobs already fail the build. New checks fail the build too, except diff coverage and Infection, which report numbers and do not enforce a blank threshold |
 | Shared reusable workflow and a Composer package for every PHP repo | Deferred | This change is local to Quay. Packaging it for other repositories is a separate decision |
 
+## Application read cap
+
+The decision is every application database read, not API lists only. `ReadCap` throws `ProhibitedRead`. It does not rewrite SQL to add a LIMIT.
+
+Enforced when the first stack frame outside the query builder and this guard is under `app/`:
+
+- MySQL/MariaDB `SELECT` through `Connection::beforeExecuting`.
+- MongoDB collection reads on `ScanEvent`, which does not emit SQL. `CappedMongoBuilder` checks the limit and the field list before `get()`.
+- Explicit column lists on those models. `SELECT *` and an empty Mongo projection fail.
+- `LIMIT` 1 through 100, including a bound integer. A limit above 100 fails. A missing limit fails. A non-integer binding fails instead of being treated as safe.
+- A `LIMIT` inside a subquery does not cap the outer read.
+- Joins are capped on returned rows, not on rows scanned per table.
+- `COUNT`, `SUM`, `AVG`, `MIN`, and `MAX` without `GROUP BY` are one result row. The rows they scan are not the result size. `GROUP BY` still needs a limit, because it can return one row per group.
+- A pagination count is that one-row aggregate. The page query still needs its own limit. This codebase has no paginator and no eager `with()`. An eager relation query would be a separate read and is not exempt.
+- The outbox relay batch must be 1..100. The default is 50. A larger `OUTBOX_BATCH` fails. It is not clamped.
+- `select 1 as ready` has no `FROM` and returns one row.
+
+Not database reads, so the cap does not claim them: Redis (cache, session, queue, rate limit, metrics hash), the filesystem, and the Mongo `{ping: 1}` admin command.
+
+These package operations are outside the guard because their originating frame is not under `app/`. They are not approved exemptions. There is no SQL allowlist.
+
+| Proposed exception | What it does | Why it is not enforced yet |
+| --- | --- | --- |
+| `EloquentUserProvider` login | `select * from users ... limit 1` | Framework hydration. Applying the star ban here would reject every password login |
+| Passport client and access-token lookup | `select *` by primary key | Library hydration during client credentials. Same star ban |
+| Migrator and schema builder | `SHOW`, `information_schema`, the `migrations` table | Package metadata during `migrate` and `RefreshDatabase`, not an application read |
+| Database session or database cache, if those drivers are selected later | Framework reads with `select *` | Today's session, cache, and queue use Redis. A driver change would not be covered by an approval that does not exist |
+
 ## Questions
 
 1. What changed-code coverage floor should fail CI? This diff is 84.21% of changed executable statements (16/19). The combined rate over all of `app/` is 71.75% (851/1186). The unit-only rate on that same denominator is 3.79% (45/1186).
 2. Should Infection fail below a minimum MSI? The measured scope is 100% of 70 mutants and does not include inventory. Should that scope be gated at 100, and should the inventory actions be added even though that run has to avoid the Gesso PHPUnit extension?
-3. Is the 100-row cap for every read, or only for API list responses? Scan events already default to 50. The proposal file is not enforced.
+3. The 100-row cap now applies to application-origin database reads. Package lookups below are not approved exemptions. Say if any of them should be enforced or explicitly allowed.
 4. Should the Rector dry-run be applied, with `AssertSeeToAssertSeeHtmlRector` left out because `/metrics` is not HTML?
 5. Is `LewisUniUni` the CODEOWNERS identity for the analysis and CI files, or should that wait for a platform-team name?
 6. Should branch protection require the five workflow jobs, an approving review, and no admin bypass? That can lock out a sole maintainer, so it was not enabled.

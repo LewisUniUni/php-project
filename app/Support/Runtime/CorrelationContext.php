@@ -10,6 +10,8 @@ final class CorrelationContext
 
     private ?string $traceId = null;
 
+    private ?string $spanId = null;
+
     private ?string $jobId = null;
 
     private ?string $clientId = null;
@@ -19,12 +21,14 @@ final class CorrelationContext
     public function replace(
         ?string $requestId,
         ?string $traceId,
+        ?string $spanId = null,
         ?string $jobId = null,
         ?string $clientId = null,
         ?string $warehouseId = null,
     ): void {
         $this->requestId = $requestId;
         $this->traceId = $traceId;
+        $this->spanId = $spanId;
         $this->jobId = $jobId;
         $this->clientId = $clientId;
         $this->warehouseId = $warehouseId;
@@ -34,6 +38,7 @@ final class CorrelationContext
     {
         $this->requestId = null;
         $this->traceId = null;
+        $this->spanId = null;
         $this->jobId = null;
         $this->clientId = null;
         $this->warehouseId = null;
@@ -47,6 +52,7 @@ final class CorrelationContext
         return array_filter([
             'request_id' => $this->requestId,
             'trace_id' => $this->traceId,
+            'span_id' => $this->spanId,
             'job_id' => $this->jobId,
             'client_id' => $this->clientId,
             'warehouse_id' => $this->warehouseId,
