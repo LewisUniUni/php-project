@@ -134,7 +134,11 @@ jobs:
         env:
           # Collision truncates failure reasons to the terminal width (80 on runners).
           COLUMNS: "250"
-        run: php artisan test
+        # phpunit.xml supplies the test configuration. An empty .env stops phpdotenv's
+        # suppressed "file_get_contents(.env)" warning from flagging every feature test.
+        run: |
+          touch .env
+          php artisan test
 
   snyk:
     runs-on: ubuntu-latest
