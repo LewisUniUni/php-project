@@ -119,6 +119,12 @@
             "Composer\\Config::disableProcessTimeout",
             "@php artisan dev"
         ],
+        "guard:changed-phpstan": "@php tools/Guardrails/changed-files.php phpstan",
+        "guard:changed-pint": "@php tools/Guardrails/changed-files.php pint",
+        "guard:packages": "@php tools/Guardrails/packages.php",
+        "guard:size": "@php tools/Guardrails/pr-size.php",
+        "guard:suppressions": "@php tools/Guardrails/suppressions.php",
+        "guard:tests": "@php tools/Guardrails/test-changes.php",
         "infection": "@php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/infection run --threads=4 --logger-text=storage/infection/infection.log --logger-summary-json=storage/infection/summary.json --test-framework-extra-args=\"--filter=StopStatus|RedactSecrets|ConfiguredInt|ConfiguredString|Identifier\"",
         "lint": "pint --test",
         "lint:syntax": "parallel-lint --exclude vendor --exclude node_modules --exclude storage --exclude bootstrap/cache app bootstrap config database public routes tests tools gesso.php",

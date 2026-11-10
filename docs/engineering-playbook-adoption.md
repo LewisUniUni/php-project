@@ -17,20 +17,28 @@ Host PHP for coverage and Infection was Ubuntu's PHP 8.5.12 with PCOV 1.0.12, re
 
 | Command | Result |
 | --- | --- |
-| `php artisan test` | Passed. 34 tests, 603 assertions. MySQL 8.4.13, Redis 8.10.3 cache and queue, MongoDB 8.0.34 |
-| `composer ci:static` | Passed after `composer audit --locked --abandoned=report`. Parallel-lint, Pint, PHPStan max, and PHPMD reported no violations |
-| `composer audit --locked --abandoned=report` | No security advisories. One abandoned transitive package remains visible: `symplify/rule-doc-generator-contracts`, pulled in by Rector |
-| `composer update --prefer-lowest --prefer-stable`, then `php artisan test` | Passed. 33 tests, 600 assertions, before the stderr-channel test was added. The lockfile was restored. The final suite on the normal resolution is 34 tests and 603 assertions |
-| Unit coverage | 45 / 1186 statements (3.79%). 89 files under `app/`. 0 production files missing from the Clover report. 75 files had statements and no covered statements |
-| Combined coverage | 851 / 1186 statements (71.75%). Same 89 files and the same 1186-statement denominator. 16 files still had no covered statements |
-| Diff coverage vs `origin/main` working tree | 16 / 19 changed executable statements (84.21%). No threshold |
+| `php artisan test` | Passed. 76 tests, 707 assertions. MySQL 8.4.13, Redis 8.10.3 cache and queue, MongoDB 8.0.34 |
+| `composer ci:static` | Passed. Parallel-lint checked 181 files. Pint, PHPStan max, PHPMD, and composer-normalize reported no violations. `composer audit --locked --abandoned=report` found no advisories and still reports abandoned `symplify/rule-doc-generator-contracts` |
+| `php vendor/bin/phpunit --filter=GuardrailTest` | Passed. 11 tests, 37 assertions |
+| `php tools/Guardrails/suppressions.php origin/main` | Passed. Exit 0 |
+| `php tools/Guardrails/test-changes.php origin/main` | Exit 0. Printed suspected assertion-line removals in `RuntimeTest` and `RedactSecretsProcessorTest`. No production path is approved, so the command does not fail |
+| `php tools/Guardrails/packages.php origin/main` | Exit 0. Eleven new direct packages returned HTTP 200 from Packagist. The output says a found package is not a trust decision |
+| `php tools/Guardrails/pr-size.php origin/main` | Exit 0. 15079 changed lines (13161 insertions, 1918 deletions, 173 files) against the merge base. No threshold |
+| `php tools/Guardrails/changed-files.php pint origin/main` | Passed |
+| `php tools/Guardrails/changed-files.php phpstan origin/main` | Passed after the changed PHP files were made valid under the project rules. The command prints that this is not the full gate |
+| `semgrep --config .semgrep/ai-smells.yml --error app` | 0 findings on 96 tracked files. The same rules find 4 findings in the fail fixtures and 0 in the pass fixture |
+| `composer update --prefer-lowest --prefer-stable` | Not re-run for this change. It rewrites `composer.lock`. The CI job still runs it |
+| Unit coverage | 180 / 1403 statements (12.83%). 96 files in the Clover report. 0 production files missing. 77 files had statements and no covered statements |
+| Combined coverage | 1070 / 1403 statements (76.27%). Same 1403-statement denominator. 14 files still had no covered statements |
+| Diff coverage vs `origin/main` | 246 / 279 changed executable statements (88.17%). No threshold |
 | Infection 0.35.10 | 70 mutants, 70 killed. MSI 100%. Covered-code MSI 100%. Scope listed below. No minimum was configured |
-| gitleaks 8.30.1 | No leaks in 7 commits |
-| SQLFluff 4.5.0 | `docker/mysql/init.sql` passed |
+| gitleaks 8.30.1 | No leaks in 9 commits |
+| SQLFluff 4.5.0 | `docker` passed |
 | hadolint 2.15.1 | `Dockerfile` passed |
 | actionlint 1.7.12 | `.github/workflows/ci.yml` passed |
 | Semgrep 1.185.0 | `.semgrep/sql-policy.yml` passed |
-| Rector 2.8.4 dry-run | Failed closed in the sense that it wants edits in 28 files. It is not a required CI check |
+| Rector 2.8.4 dry-run | Not re-run. The earlier dry-run wanted edits in 28 files, including an unsafe `AssertSeeToAssertSeeHtml` change. It is not a required CI check |
+| Snyk | Not re-run locally. The workflow still fails closed without `SNYK_TOKEN`, and Open Source, Code, Container, and IaC still use `--severity-threshold=high` |
 
 The previous quality job on `main` was 17 tests and 104 assertions. The added assertions are mostly Eris samples on the delivery state machine, plus the new policy tests. Feature behaviour was re-run against the real stores.
 
@@ -38,7 +46,7 @@ Snyk was not re-run here. The workflow still fails closed without `SNYK_TOKEN`, 
 
 ## Coverage denominator
 
-`phpunit.xml` includes `app/` and sets `includeUncoveredFiles="true"`. `tools/Coverage/summarize.php` counts every Clover `<line type="stmt">`, including files whose covered-statement count is zero, and exits 1 if any `app/**/*.php` file is absent from the report. The unit and combined reports both contain all 89 application files, so the 3.79% unit figure is not a covered-files-only rate.
+`phpunit.xml` includes `app/` and sets `includeUncoveredFiles="true"`. `tools/Coverage/summarize.php` counts every Clover `<line type="stmt">`, including files whose covered-statement count is zero, and exits 1 if any `app/**/*.php` file is absent from the report. The unit and combined reports both contain 96 files and the same 1403 statements, with 0 production files missing, so the 12.83% unit figure is not a covered-files-only rate.
 
 `routes/`, `config/`, `database/`, and `bootstrap/` are outside that denominator. They are part of the running application and are included in PHPStan.
 
@@ -178,7 +186,8 @@ The max-level fixes included a real logging bug: `config/logging.php` defined `s
 | `AGENTS.md`, with `CLAUDE.md` importing it | Implemented | Boost wrote the Laravel guidelines into `AGENTS.md`. The Quay gate section is after that block. `CLAUDE.md` is `@AGENTS.md` |
 | Agent hooks run PHPStan, tests, and Pint on every edit | Deferred | Pint runs from CaptainHook on commit. The test suite needs MySQL, two Redis processes, and MongoDB. An every-edit hook that runs that suite would fail closed for the wrong reason |
 | MCP for current library docs | Implemented | `laravel/boost` and `.mcp.json`. Boost does not register its Artisan commands unless `APP_ENV=local` or debug is on |
-| Plan, then tests; small tasks; a second review model | Deferred | Those are review habits, not repository settings |
+| Plan, then tests; small tasks; full finish gates | Implemented | `AGENTS.md` records the approved sequence: plan approval, test approval, tests stay as approved, small diffs, then the full Pint and PHPStan gates. The checks under `tools/Guardrails/` enforce suppressions, missing packages, and smell rules. Deleted tests and suspected assertion edits are printed and do not fail. `tools/Guardrails/approved-tests.txt` enrolls no production test |
+| A second review model | Deferred | No independent second-model review has been run |
 
 `php artisan boost:install` rewrites `AGENTS.md` and `CLAUDE.md`. A later install can replace the import and the Quay gate section. Re-apply them if that happens.
 
@@ -264,6 +273,22 @@ These package operations are outside the guard because their originating frame i
 | Passport client and access-token lookup | `select *` by primary key | Library hydration during client credentials. Same star ban |
 | Migrator and schema builder | `SHOW`, `information_schema`, the `migrations` table | Package metadata during `migrate` and `RefreshDatabase`, not an application read |
 | Database session or database cache, if those drivers are selected later | Framework reads with `select *` | Today's session, cache, and queue use Redis. A driver change would not be covered by an approval that does not exist |
+
+## AI guardrails
+
+These checks are in addition to the full Pint, PHPStan, Composer audit, and Snyk high gates. They do not replace those gates. No second-model review has been run.
+
+| Control | What it does | Enforcement |
+| --- | --- | --- |
+| Suppressions | Base-relative. A new or moved `@phpstan-ignore` or `@psalm-suppress` fails. Deleting one passes. Adding or editing a baseline fails. Deleting a baseline passes. `ignoreErrors` entries in `phpstan.neon` must stay identical to the base or be removed. The current `staticMethod.dynamicCall` entry is that frozen identity | Failing |
+| Test edits | Deleted tests and removed assertion lines are printed. The print is not proof that a test was weakened. A path fails only when it is listed in `tools/Guardrails/approved-tests.txt` | Report only. The list is empty, so no production test is frozen |
+| Changed-file Pint and PHPStan | Paths come from `git diff` against the merge base. Pint is `--test` on those files, not `--dirty`. Changed-file PHPStan does not see cross-file errors. Smell fixtures under `tools/Guardrails/fixtures/` are left out of this list because they are the negative cases | Extra. `composer lint` and `composer analyse` still run on the whole project |
+| Package existence | A new direct Composer package that Packagist answers 404 for fails. HTTP 200 only means the name exists. A timeout or 5xx exits 2 and says the registry was unavailable | Failing for a missing name. Outage is a different exit code |
+| Dependency review | `actions/dependency-review-action` `a1d282b36b6f3519aa1f3fc636f609c47dddb294` on pull requests. Vulnerability check at high for runtime and development. License check is off. It does not prove a package is trustworthy | Failing on high advisories. No license list |
+| Code smells | Semgrep `quay-empty-catch` and `quay-debug-call`, local rules, no Semgrep account. A catch that logs and rethrows is clean. Mocking the class under test is not inferred | Failing |
+| Pull request size | The changed-line count is printed | Report only. No numeric cap |
+
+`AGENTS.md` still contains the generated Laravel Boost guidelines, and `CLAUDE.md` imports that file. How to keep a short tool-neutral file when `boost:install` rewrites both is unresolved. The approved workflow section was appended. Boost was not re-run.
 
 ## Questions
 

@@ -186,4 +186,16 @@ Local commands, from the repository root, on PHP 8.5 with PCOV when coverage or 
 
 Coverage and Infection need a PHP binary that can load PCOV. The Herd lite binary in this environment cannot load shared extensions. CI uses `shivammathur/setup-php` with `coverage: pcov`.
 
-Do not convert these tests to Pest, replace FrankenPHP with PHP-FPM, or turn on a universal 100-row query cap unless that decision is explicit. `tools/sql/row-cap.proposed.yml` is not enforced.
+Application database reads are capped at 100 result rows. Redis and the filesystem are outside that cap. The details are in `docs/engineering-playbook-adoption.md`.
+
+# Approved agent workflow
+
+The Laravel Boost block above is generated. Replacing it with a shorter tool-neutral file, and stopping `boost:install` from overwriting `AGENTS.md` and `CLAUDE.md`, is not decided. Do not run `boost:install` in a way that removes this section until that choice is recorded. `CLAUDE.md` imports this file.
+
+- Review a plan before changing code.
+- Approve tests next. Those tests are the spec.
+- A test file stays editable until a person adds its path to `tools/Guardrails/approved-tests.txt`. That file has no paths. No production test is frozen.
+- Keep each change small. This repository's open pull request is already large. Say that, and do not hide generated files or the lockfile.
+- Changed-file Pint is `composer guard:changed-pint`. It passes explicit paths from the merge base. It is not `pint --dirty`, and it does not replace `composer lint`.
+- Changed-file PHPStan is `composer guard:changed-phpstan`. It misses cross-file errors. `composer analyse` remains the full gate. Run `composer ci:static` and `php artisan test` before finishing.
+- A second model has not reviewed the current diff. Do not claim that review happened.

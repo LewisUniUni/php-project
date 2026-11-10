@@ -64,7 +64,12 @@ final class DiffCoverage
 
         $lines = [];
 
-        foreach ($xml->xpath('//file') ?: [] as $file) {
+        $nodes = $xml->xpath('//file');
+        if (! is_array($nodes)) {
+            $nodes = [];
+        }
+
+        foreach ($nodes as $file) {
             $name = str_replace('\\', '/', (string) $file['name']);
 
             foreach ($file->line as $line) {
@@ -88,7 +93,12 @@ final class DiffCoverage
         $file = null;
         $line = 0;
 
-        foreach (preg_split("/\r\n|\n|\r/", $diff) ?: [] as $row) {
+        $rows = preg_split("/\r\n|\n|\r/", $diff);
+        if (! is_array($rows)) {
+            $rows = [];
+        }
+
+        foreach ($rows as $row) {
             if (str_starts_with($row, '+++ b/')) {
                 $file = substr($row, 6);
 

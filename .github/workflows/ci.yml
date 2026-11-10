@@ -89,7 +89,23 @@ jobs:
         run: python3 -m sqlfluff lint docker
 
       - name: Semgrep
-        run: python3 -m semgrep scan --config .semgrep/sql-policy.yml --error --metrics=off
+        run: |
+          python3 -m semgrep scan --config .semgrep/sql-policy.yml --error --metrics=off
+          python3 -m semgrep scan --config .semgrep/ai-smells.yml --error --metrics=off app
+
+      - name: Fetch diff base
+        run: git fetch origin main
+
+      - name: Guardrails
+        env:
+          GUARD_BASE: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+        run: |
+          php tools/Guardrails/suppressions.php "$GUARD_BASE"
+          php tools/Guardrails/test-changes.php "$GUARD_BASE"
+          php tools/Guardrails/packages.php "$GUARD_BASE"
+          php tools/Guardrails/pr-size.php "$GUARD_BASE"
+          php tools/Guardrails/changed-files.php pint "$GUARD_BASE"
+          php tools/Guardrails/changed-files.php phpstan "$GUARD_BASE"
 
   tests:
     runs-on: ubuntu-latest
@@ -162,6 +178,9 @@ jobs:
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install Semgrep for smell fixtures
+        run: python3 -m pip install --user -r tools/ci/requirements.txt
 
       - name: Unit coverage
         env:
@@ -336,3 +355,21 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk iac test Dockerfile compose.yaml --severity-threshold=high
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          vulnerability-check: true
+          license-check: false
+          fail-on-severity: high
+          fail-on-scopes: runtime,development

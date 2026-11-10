@@ -83,7 +83,12 @@ final class CloverSummary
 
         $files = [];
 
-        foreach ($xml->xpath('//file') ?: [] as $file) {
+        $nodes = $xml->xpath('//file');
+        if (! is_array($nodes)) {
+            $nodes = [];
+        }
+
+        foreach ($nodes as $file) {
             $name = (string) $file['name'];
             $statements = 0;
             $covered = 0;

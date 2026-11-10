@@ -6,21 +6,32 @@ require __DIR__.'/CloverSummary.php';
 
 use Quay\Tools\Coverage\CloverSummary;
 
-if ($argc < 3) {
+$arguments = [];
+if (isset($_SERVER['argv']) && is_array($_SERVER['argv'])) {
+    foreach ($_SERVER['argv'] as $argument) {
+        if (is_string($argument)) {
+            $arguments[] = $argument;
+        }
+    }
+}
+
+if (count($arguments) < 3) {
     fwrite(STDERR, "Usage: summarize.php <clover.xml> <summary.md> [production-dir]\n");
     exit(2);
 }
 
-$cloverFile = $argv[1];
-$summaryFile = $argv[2];
-$productionDir = $argv[3] ?? 'app';
+$cloverFile = $arguments[1];
+$summaryFile = $arguments[2];
+$productionDir = $arguments[3] ?? 'app';
 $productionFiles = [];
 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($productionDir, FilesystemIterator::SKIP_DOTS));
 
 foreach ($iterator as $file) {
-    if ($file->isFile() && $file->getExtension() === 'php') {
-        $productionFiles[] = $file->getPathname();
+    if (! $file instanceof SplFileInfo || ! $file->isFile() || $file->getExtension() !== 'php') {
+        continue;
     }
+
+    $productionFiles[] = $file->getPathname();
 }
 
 sort($productionFiles);

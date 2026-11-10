@@ -6,13 +6,22 @@ require __DIR__.'/DiffCoverage.php';
 
 use Quay\Tools\Coverage\DiffCoverage;
 
-if ($argc < 2) {
+$arguments = [];
+if (isset($_SERVER['argv']) && is_array($_SERVER['argv'])) {
+    foreach ($_SERVER['argv'] as $argument) {
+        if (is_string($argument)) {
+            $arguments[] = $argument;
+        }
+    }
+}
+
+if (count($arguments) < 2) {
     fwrite(STDERR, "Usage: diff-coverage.php <clover.xml> [summary.md]\n");
     exit(2);
 }
 
-$cloverFile = $argv[1];
-$summaryFile = $argv[2] ?? 'storage/coverage/diff-coverage.md';
+$cloverFile = $arguments[1];
+$summaryFile = $arguments[2] ?? 'storage/coverage/diff-coverage.md';
 $diff = '';
 $base = 'not measured';
 
