@@ -131,6 +131,9 @@ jobs:
         run: php artisan gesso:routes --prefix=api/v1 --fail-on-undocumented --fail-on-unimplemented --exclude-openapi-path=/oauth/token --exclude-openapi-path=/ready
 
       - name: Tests
+        env:
+          # Collision truncates failure reasons to the terminal width (80 on runners).
+          COLUMNS: "250"
         run: php artisan test
 
   snyk:

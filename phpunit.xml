@@ -7,7 +7,6 @@
     <extensions>
         <bootstrap class="Studio\Gesso\PHPUnit\OpenApiCoverageExtension"/>
     </extensions>
->
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
