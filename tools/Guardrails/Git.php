@@ -91,8 +91,18 @@ final class Git
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
+        $safe = [];
+        foreach ($command as $argument) {
+            $token = Tokens::keep($argument);
+            if ($token === null) {
+                throw new RuntimeException('Refusing an unsafe command argument');
+            }
+
+            $safe[] = $token;
+        }
+
         $cwd = getcwd();
-        $process = proc_open($command, $spec, $pipes, $cwd === false ? null : $cwd);
+        $process = proc_open($safe, $spec, $pipes, $cwd === false ? null : $cwd);
         if (! is_resource($process)) {
             throw new RuntimeException('Could not start '.implode(' ', $command));
         }

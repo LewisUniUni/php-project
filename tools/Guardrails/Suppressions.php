@@ -19,41 +19,12 @@ final class Suppressions
         sort($paths);
 
         foreach ($paths as $path) {
-            $before = $base[$path] ?? null;
-            $after = $head[$path] ?? null;
-
-            if (self::isBaseline($path)) {
-                if ($after !== null && $before === null) {
-                    $added[] = $path.' was added';
-                } elseif ($before !== null && $after !== null && $before !== $after) {
-                    $added[] = $path.' changed';
-                } elseif ($before !== null && $after === null) {
-                    $removed[] = $path.' was removed';
-                }
-
-                continue;
+            $change = self::reviewPath($path, $base[$path] ?? null, $head[$path] ?? null);
+            foreach ($change['added'] as $item) {
+                $added[] = $item;
             }
-
-            if (str_ends_with($path, 'phpstan.neon')) {
-                foreach (self::entryDelta(self::ignoreEntries($before ?? ''), self::ignoreEntries($after ?? '')) as $kind => $items) {
-                    foreach ($items as $item) {
-                        if ($kind === 'added') {
-                            $added[] = $path.' ignore '.$item;
-                        } else {
-                            $removed[] = $path.' ignore '.$item;
-                        }
-                    }
-                }
-            }
-
-            foreach (self::entryDelta(self::comments($path, $before ?? ''), self::comments($path, $after ?? '')) as $kind => $items) {
-                foreach ($items as $item) {
-                    if ($kind === 'added') {
-                        $added[] = $item;
-                    } else {
-                        $removed[] = $item;
-                    }
-                }
+            foreach ($change['removed'] as $item) {
+                $removed[] = $item;
             }
         }
 
@@ -62,6 +33,73 @@ final class Suppressions
             'added' => $added,
             'removed' => $removed,
         ];
+    }
+
+    /**
+     * @return array{added: list<string>, removed: list<string>}
+     */
+    private static function reviewPath(string $path, ?string $before, ?string $after): array
+    {
+        if (self::isBaseline($path)) {
+            return self::baselineChange($path, $before, $after);
+        }
+
+        $added = [];
+        $removed = [];
+
+        if (str_ends_with($path, 'phpstan.neon')) {
+            self::record(
+                $added,
+                $removed,
+                $path.' ignore ',
+                self::entryDelta(self::ignoreEntries($before ?? ''), self::ignoreEntries($after ?? '')),
+            );
+        }
+
+        self::record(
+            $added,
+            $removed,
+            '',
+            self::entryDelta(self::comments($path, $before ?? ''), self::comments($path, $after ?? '')),
+        );
+
+        return ['added' => $added, 'removed' => $removed];
+    }
+
+    /**
+     * @return array{added: list<string>, removed: list<string>}
+     */
+    private static function baselineChange(string $path, ?string $before, ?string $after): array
+    {
+        if ($after !== null && $before === null) {
+            return ['added' => [$path.' was added'], 'removed' => []];
+        }
+
+        if ($before !== null && $after !== null && $before !== $after) {
+            return ['added' => [$path.' changed'], 'removed' => []];
+        }
+
+        if ($before !== null && $after === null) {
+            return ['added' => [], 'removed' => [$path.' was removed']];
+        }
+
+        return ['added' => [], 'removed' => []];
+    }
+
+    /**
+     * @param  list<string>  $added
+     * @param  list<string>  $removed
+     * @param  array{added: list<string>, removed: list<string>}  $delta
+     */
+    private static function record(array &$added, array &$removed, string $prefix, array $delta): void
+    {
+        foreach ($delta['added'] as $item) {
+            $added[] = $prefix.$item;
+        }
+
+        foreach ($delta['removed'] as $item) {
+            $removed[] = $prefix.$item;
+        }
     }
 
     /**
@@ -102,7 +140,12 @@ final class Suppressions
         $lines = Text::lines($source);
 
         foreach ($lines as $index => $line) {
-            if (preg_match('/@(?:phpstan-ignore(?:-next-line)?|psalm-suppress)\b/', $line) !== 1) {
+            $code = preg_replace('/\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"/', '', $line);
+            if (! is_string($code)) {
+                $code = $line;
+            }
+
+            if (preg_match('/@(?:phpstan-ignore(?:-next-line)?|psalm-suppress)\b/', $code) !== 1) {
                 continue;
             }
 

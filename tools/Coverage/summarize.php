@@ -3,26 +3,25 @@
 declare(strict_types=1);
 
 require __DIR__.'/CloverSummary.php';
+require dirname(__DIR__).'/Guardrails/Tokens.php';
 
 use Quay\Tools\Coverage\CloverSummary;
+use Quay\Tools\Guardrails\Tokens;
 
-$arguments = [];
-if (isset($_SERVER['argv']) && is_array($_SERVER['argv'])) {
-    foreach ($_SERVER['argv'] as $argument) {
-        if (is_string($argument)) {
-            $arguments[] = $argument;
-        }
-    }
-}
+$arguments = Tokens::fromGlobals();
 
 if (count($arguments) < 3) {
     fwrite(STDERR, "Usage: summarize.php <clover.xml> <summary.md> [production-dir]\n");
     exit(2);
 }
 
-$cloverFile = $arguments[1];
-$summaryFile = $arguments[2];
-$productionDir = $arguments[3] ?? 'app';
+$cloverFile = Tokens::keep($arguments[1]);
+$summaryFile = Tokens::keep($arguments[2]);
+$productionDir = Tokens::keep($arguments[3] ?? 'app');
+if ($cloverFile === null || $summaryFile === null || $productionDir === null) {
+    fwrite(STDERR, "Refusing a coverage path.\n");
+    exit(2);
+}
 $productionFiles = [];
 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($productionDir, FilesystemIterator::SKIP_DOTS));
 

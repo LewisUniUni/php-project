@@ -7,6 +7,7 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 use Quay\Tools\Guardrails\Cli;
 use Quay\Tools\Guardrails\Git;
 use Quay\Tools\Guardrails\Packages;
+use Quay\Tools\Guardrails\Tokens;
 
 $base = Cli::base(Cli::arguments(), 1);
 $merge = Git::mergeBase($base);
@@ -14,7 +15,12 @@ $before = Git::file($merge, 'composer.json') ?? '{}';
 $after = Git::file('HEAD', 'composer.json') ?? '{}';
 $added = Packages::newDirectPackages($before, $after);
 $result = Packages::verify($added, static function (string $package): int {
-    $url = 'https://repo.packagist.org/p2/'.$package.'.json';
+    $name = Tokens::keep($package);
+    if ($name === null) {
+        return 404;
+    }
+
+    $url = 'https://repo.packagist.org/p2/'.$name.'.json';
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',

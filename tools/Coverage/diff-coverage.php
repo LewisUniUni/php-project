@@ -3,25 +3,24 @@
 declare(strict_types=1);
 
 require __DIR__.'/DiffCoverage.php';
+require dirname(__DIR__).'/Guardrails/Tokens.php';
 
 use Quay\Tools\Coverage\DiffCoverage;
+use Quay\Tools\Guardrails\Tokens;
 
-$arguments = [];
-if (isset($_SERVER['argv']) && is_array($_SERVER['argv'])) {
-    foreach ($_SERVER['argv'] as $argument) {
-        if (is_string($argument)) {
-            $arguments[] = $argument;
-        }
-    }
-}
+$arguments = Tokens::fromGlobals();
 
 if (count($arguments) < 2) {
     fwrite(STDERR, "Usage: diff-coverage.php <clover.xml> [summary.md]\n");
     exit(2);
 }
 
-$cloverFile = $arguments[1];
-$summaryFile = $arguments[2] ?? 'storage/coverage/diff-coverage.md';
+$cloverFile = Tokens::keep($arguments[1]);
+$summaryFile = Tokens::keep($arguments[2] ?? 'storage/coverage/diff-coverage.md');
+if ($cloverFile === null || $summaryFile === null) {
+    fwrite(STDERR, "Refusing a coverage path.\n");
+    exit(2);
+}
 $diff = '';
 $base = 'not measured';
 

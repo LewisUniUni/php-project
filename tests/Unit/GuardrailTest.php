@@ -10,6 +10,7 @@ use Quay\Tools\Guardrails\Packages;
 use Quay\Tools\Guardrails\PullRequestSize;
 use Quay\Tools\Guardrails\Suppressions;
 use Quay\Tools\Guardrails\TestChanges;
+use Quay\Tools\Guardrails\Tokens;
 use Symfony\Component\Process\Process;
 
 final class GuardrailTest extends TestCase
@@ -69,6 +70,18 @@ final class GuardrailTest extends TestCase
         $this->assertTrue($added['fail']);
         $this->assertTrue($changed['fail']);
         $this->assertFalse($deleted['fail']);
+    }
+
+    public function test_a_quoted_ignore_annotation_is_not_an_added_suppression(): void
+    {
+        $quoted = '        $added = [\'app/Example.php\' => "<?php\\n/** @phpstan-ignore-next-line */\\n"];';
+        $result = Suppressions::compare(
+            ['tests/Unit/GuardrailTest.php' => "<?php\n"],
+            ['tests/Unit/GuardrailTest.php' => "<?php\n".$quoted."\n"],
+        );
+
+        $this->assertFalse($result['fail']);
+        $this->assertSame([], $result['added']);
     }
 
     public function test_deleted_tests_and_suspected_weakening_are_reported_without_failing(): void
@@ -156,6 +169,15 @@ final class GuardrailTest extends TestCase
         $this->assertIsString($cli);
         $this->assertStringContainsString('No failure threshold is configured.', $cli);
         $this->assertStringContainsString('exit(0);', $cli);
+    }
+
+    public function test_command_tokens_reject_traversal_and_keep_repository_paths(): void
+    {
+        $this->assertSame('origin/main', Tokens::keep('origin/main'));
+        $this->assertSame('storage/coverage/unit-summary.md', Tokens::keep('storage/coverage/unit-summary.md'));
+        $this->assertSame('--memory-limit=1G', Tokens::keep('--memory-limit=1G'));
+        $this->assertNull(Tokens::keep('../etc/passwd'));
+        $this->assertNull(Tokens::keep('app/A.php;rm'));
     }
 
     public function test_semgrep_rejects_empty_catches_and_debug_calls_and_allows_rethrow(): void

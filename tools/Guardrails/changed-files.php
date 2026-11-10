@@ -7,6 +7,7 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 use Quay\Tools\Guardrails\ChangedFiles;
 use Quay\Tools\Guardrails\Cli;
 use Quay\Tools\Guardrails\Git;
+use Quay\Tools\Guardrails\Tokens;
 
 $arguments = Cli::arguments();
 $mode = $arguments[1] ?? '';
@@ -28,8 +29,19 @@ if ($mode === 'phpstan') {
 }
 fwrite(STDOUT, 'Running '.implode(' ', $command)."\n");
 
+$safe = [];
+foreach ($command as $argument) {
+    $token = Tokens::keep($argument);
+    if ($token === null) {
+        fwrite(STDERR, "Refusing an unsafe command argument.\n");
+        exit(2);
+    }
+
+    $safe[] = $token;
+}
+
 $pipes = [];
-$process = proc_open($command, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
+$process = proc_open($safe, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
 if (! is_resource($process)) {
     fwrite(STDERR, "Could not start the changed-file command.\n");
     exit(2);

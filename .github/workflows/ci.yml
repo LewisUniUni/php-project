@@ -90,8 +90,9 @@ jobs:
 
       - name: Semgrep
         run: |
-          python3 -m semgrep scan --config .semgrep/sql-policy.yml --error --metrics=off
-          python3 -m semgrep scan --config .semgrep/ai-smells.yml --error --metrics=off app
+          export PATH="${HOME}/.local/bin:${PATH}"
+          semgrep scan --config .semgrep/sql-policy.yml --error --metrics=off
+          semgrep scan --config .semgrep/ai-smells.yml --error --metrics=off app
 
       - name: Fetch diff base
         run: git fetch origin main
@@ -300,6 +301,9 @@ jobs:
 
       - name: Install lowest allowed dependencies
         run: composer update --prefer-lowest --prefer-stable --no-interaction --no-progress
+
+      - name: Install Semgrep for smell fixtures
+        run: python3 -m pip install --user -r tools/ci/requirements.txt
 
       - name: Test lowest allowed dependencies
         env:

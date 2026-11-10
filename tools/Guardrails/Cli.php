@@ -11,18 +11,7 @@ final class Cli
      */
     public static function arguments(): array
     {
-        if (! isset($_SERVER['argv']) || ! is_array($_SERVER['argv'])) {
-            return [];
-        }
-
-        $arguments = [];
-        foreach ($_SERVER['argv'] as $argument) {
-            if (is_string($argument)) {
-                $arguments[] = $argument;
-            }
-        }
-
-        return $arguments;
+        return Tokens::fromGlobals();
     }
 
     /**

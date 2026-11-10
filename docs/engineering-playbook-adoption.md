@@ -38,7 +38,13 @@ Host PHP for coverage and Infection was Ubuntu's PHP 8.5.12 with PCOV 1.0.12, re
 | actionlint 1.7.12 | `.github/workflows/ci.yml` passed |
 | Semgrep 1.185.0 | `.semgrep/sql-policy.yml` passed |
 | Rector 2.8.4 dry-run | Not re-run. The earlier dry-run wanted edits in 28 files, including an unsafe `AssertSeeToAssertSeeHtml` change. It is not a required CI check |
-| Snyk | Not re-run locally. The workflow still fails closed without `SNYK_TOKEN`, and Open Source, Code, Container, and IaC still use `--severity-threshold=high` |
+| Snyk | Not re-run locally. The workflow still fails closed without `SNYK_TOKEN`, and Open Source, Code, Container, and IaC still use `--severity-threshold=high`. GitHub run `42898157779` failed Snyk Code on the new CLI scripts. Those scripts now pass only a matched token into `proc_open` and coverage output paths |
+
+GitHub run `42898157779` on `f3dbb2b` also failed three other jobs. Tests and gitleaks passed.
+
+- Hygiene Semgrep exited 2 before scanning. `python3 -m semgrep` cannot find the pip user install unless `~/.local/bin` is on `PATH`. The step now runs the `semgrep` binary from that directory.
+- prefer-lowest ran the suite without Semgrep installed, so `GuardrailTest` stopped. That job now installs `tools/ci/requirements.txt` before `php artisan test`.
+- `dependency-review` failed because the repository dependency graph is disabled. Enabling it through the GitHub API returned 403. The job is still required and was not given `continue-on-error`. It will keep failing until an owner turns the graph on at `https://github.com/LewisUniUni/php-project/settings/security_analysis`.
 
 The previous quality job on `main` was 17 tests and 104 assertions. The added assertions are mostly Eris samples on the delivery state machine, plus the new policy tests. Feature behaviour was re-run against the real stores.
 
