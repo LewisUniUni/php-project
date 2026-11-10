@@ -29,7 +29,7 @@
         "phpat/phpat": "^0.12",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.1",
-        "phpunit/phpunit": "^12.5.12",
+        "phpunit/phpunit": "^13.4.6",
         "studio-design/gesso": "^2.9",
         "symfony/yaml": "^8.1"
     },
