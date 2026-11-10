@@ -296,13 +296,11 @@ These checks are in addition to the full Pint, PHPStan, Composer audit, and Snyk
 
 `AGENTS.md` still contains the generated Laravel Boost guidelines, and `CLAUDE.md` imports that file. How to keep a short tool-neutral file when `boost:install` rewrites both is unresolved. The approved workflow section was appended. Boost was not re-run.
 
-## FrankenPHP binary
+## FrankenPHP image
 
-The runtime base remains `dunglas/frankenphp:1.13.5-php8.5.12-trixie` digest `sha256:7e73a27eb7712a5b4073b92f8f0dec91e9400138604b76cc791589faaa6a639c`. That official image already contains PHP 8.5.12. PHP 8.5.12 fixes PHP2Shell. FrankenPHP 1.13.5 fixes FrankenPHP and Caddy advisories. Neither release removes the Debian package highs or the unfixed `go-jose` v3 module.
+The runtime is the official image `dunglas/frankenphp:1.13.5-php8.5.12-trixie` digest `sha256:7e73a27eb7712a5b4073b92f8f0dec91e9400138604b76cc791589faaa6a639c`, including that image's own binary. Docker Hub still published that digest on 10 Nov 2026, last pushed 5 Nov 2026. A custom rebuild that pinned `smallstep/certificates` at `cddde30` was tried and then removed. The same go-jose v3.0.5 module is in the official Trixie, Bookworm, and Alpine 1.13.5 binaries that were inspected. Replacing only this repository's binary did not change the Debian packages PHP links, and it made this repository responsible for a Go build. The official binary is restored for that reason. This is not a decision that the findings are acceptable in production, and it is not permission to merge.
 
-The binary copied into that image is built from the builder image of the same tag, whose source checkout is commit `a3663e9e2cc4c258018a28ee068e50cc12f3ed2d`. `docker/frankenphp/go.mod` pins `github.com/smallstep/certificates` to `v0.30.3-0.20261105204752-cddde30af36e`, which is commit `cddde30af36e238f156bb557bfd1f11a05ffe6f9`. That upstream commit moves `go.step.sm/crypto` onto go-jose v4. There is no `replace` of go-jose v3. `go.sum` is committed. The module does not list go-jose v3.
-
-This repository maintains that pin until smallstep tags a release containing `cddde30`. Then the pin should move to the tag. When an official FrankenPHP image's binary no longer contains go-jose v3, delete the `frankenphp-bin` stage and `docker/frankenphp` and return to the official binary. Debian packages stay in the image because PHP curl and XML are linked to them. The 16 Debian highs remain visible and still fail `snyk container test --severity-threshold=high`.
+Snyk Container stays `--severity-threshold=high`, with no exclusion and no `continue-on-error`. On the earlier official-image run `42899482069`, that scan reported 16 Debian highs plus `SNYK-GOLANG-GITHUBCOMGOJOSEGOJOSEV3-21755479` in `/usr/local/bin/frankenphp`. Those IDs are for the versions in that image, not a claim about every FrankenPHP build. A new scan of this restored image is the current result.
 
 ## Questions
 

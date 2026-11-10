@@ -1,7 +1,0 @@
-frankenphp_tag=v1.13.5
-frankenphp_commit=a3663e9e2cc4c258018a28ee068e50cc12f3ed2d
-certificates_commit=cddde30af36e238f156bb557bfd1f11a05ffe6f9
-certificates_module=github.com/smallstep/certificates v0.30.3-0.20261105204752-cddde30af36e
-go_jose_v4=v4.1.9
-builder_image=dunglas/frankenphp:1.13.5-builder-php8.5.12-trixie@sha256:5b553d5b993d3f0cbe187ee0a6a69b41f30c9ce355442a1b3e5aea24682eaa04
-runtime_image=dunglas/frankenphp:1.13.5-php8.5.12-trixie@sha256:7e73a27eb7712a5b4073b92f8f0dec91e9400138604b76cc791589faaa6a639c
