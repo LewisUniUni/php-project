@@ -23,7 +23,7 @@ final class RecordScanEvent
         CarbonImmutable $recordedAt,
         ?array $device,
     ): ScanEventView {
-        $existing = ScanEvent::query()->where('event_id', $eventId)->first();
+        $existing = ScanEvent::query()->select(ScanEvent::readColumns())->where('event_id', $eventId)->first();
 
         if ($existing instanceof ScanEvent) {
             return $this->view($existing, true);
@@ -44,7 +44,7 @@ final class RecordScanEvent
                 throw $exception;
             }
 
-            $created = ScanEvent::query()->where('event_id', $eventId)->first();
+            $created = ScanEvent::query()->select(ScanEvent::readColumns())->where('event_id', $eventId)->first();
 
             if (! $created instanceof ScanEvent) {
                 throw $exception;

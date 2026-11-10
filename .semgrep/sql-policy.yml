@@ -1,0 +1,32 @@
+rules:
+  - id: quay-no-raw-sql-in-app
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Raw SQL APIs are banned in app/. phpstan-dba does not analyze Eloquent,
+      so this rule only rejects the raw call shapes. It does not prove that a
+      query builder statement is safe.
+    paths:
+      include:
+        - app
+    pattern-either:
+      - pattern: DB::raw(...)
+      - pattern: DB::select(...)
+      - pattern: DB::statement(...)
+      - pattern: DB::unprepared(...)
+      - pattern: DB::affectingStatement(...)
+      - pattern: $QUERY->selectRaw(...)
+      - pattern: $QUERY->whereRaw(...)
+      - pattern: $QUERY->orWhereRaw(...)
+      - pattern: $QUERY->orderByRaw(...)
+      - pattern: $QUERY->groupByRaw(...)
+      - pattern: $QUERY->havingRaw(...)
+      - pattern: $QUERY->fromRaw(...)
+  - id: quay-no-select-star-in-sql-files
+    languages: [generic]
+    severity: ERROR
+    message: Checked SQL files may not use SELECT *. This does not inspect Eloquent.
+    paths:
+      include:
+        - "*.sql"
+    pattern-regex: (?i)\bselect\s+\*

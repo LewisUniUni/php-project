@@ -1,6 +1,7 @@
 # Documentation
 
 - [Architecture](architecture.md) is the current design: decisions, compatibility, gates, operations, phases, and sources.
+- [Engineering playbook adoption](engineering-playbook-adoption.md) maps the robustness playbook onto this repository and records what is not done.
 - [Implementation status](implementation-status.md) says what this draft runs and what it does not.
 - [OpenAPI 3.1 contract](api/openapi.yaml) is the HTTP source of truth.
 - [Driver and PDA client boundary](api/clients.md) describes the API those clients would call. There is no native app in this repository.

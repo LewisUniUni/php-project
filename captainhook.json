@@ -1,0 +1,14 @@
+{
+    "config": {
+        "vendor-directory": "vendor",
+        "ansi-colors": true
+    },
+    "pre-commit": {
+        "enabled": true,
+        "actions": [
+            {
+                "action": "vendor/bin/pint --dirty"
+            }
+        ]
+    }
+}

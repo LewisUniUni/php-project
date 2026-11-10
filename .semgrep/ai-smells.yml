@@ -1,0 +1,16 @@
+rules:
+  - id: quay-empty-catch
+    languages: [php]
+    severity: ERROR
+    message: An empty catch hides the failure. Log it and rethrow, or handle it.
+    pattern-regex: 'catch\s*\([^;{}]*\)\s*\{\s*\}'
+  - id: quay-debug-call
+    languages: [php]
+    severity: ERROR
+    message: Debug output does not belong in committed code.
+    pattern-either:
+      - pattern: dd(...)
+      - pattern: dump(...)
+      - pattern: var_dump(...)
+      - pattern: ray(...)
+      - pattern: ddd(...)

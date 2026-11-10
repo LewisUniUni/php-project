@@ -28,7 +28,15 @@ abstract class TestCase extends BaseTestCase
             Redis::connection($connection)->flushdb();
         }
 
-        DB::connection('mongodb')->getDatabase()->selectCollection('scan_events')->deleteMany([]);
+        $connection = DB::connection('mongodb');
+        $this->assertTrue(method_exists($connection, 'getDatabase'));
+        $database = $connection->getDatabase();
+        $this->assertIsObject($database);
+        $this->assertTrue(method_exists($database, 'selectCollection'));
+        $collection = $database->selectCollection('scan_events');
+        $this->assertIsObject($collection);
+        $this->assertTrue(method_exists($collection, 'deleteMany'));
+        $collection->deleteMany([]);
     }
 
     /**

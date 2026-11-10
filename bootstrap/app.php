@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Console\HeartbeatCommand;
 use App\Console\HeartbeatStatusCommand;
 use App\Http\Controllers\MetricsController;

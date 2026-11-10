@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Support\Runtime\CorrelationContext;
 use App\Support\Runtime\ResetWorkerRequestState;
+use App\Support\Values\ConfiguredInt;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
@@ -31,8 +32,12 @@ final class RuntimeTest extends TestCase
         $ready->assertJsonPath('checks.redis_cache', true);
         $ready->assertJsonPath('checks.redis_queue', true);
         $ready->assertJsonPath('checks.mongodb', true);
-        $this->assertStringNotContainsString('local-migrator-password', (string) $ready->getContent());
-        $this->assertStringNotContainsString((string) config('app.key'), (string) $ready->getContent());
+        $readyBody = $ready->getContent();
+        $appKey = config('app.key');
+        $this->assertIsString($readyBody);
+        $this->assertIsString($appKey);
+        $this->assertStringNotContainsString('local-migrator-password', $readyBody);
+        $this->assertStringNotContainsString($appKey, $readyBody);
 
         $metrics = $this->get('/metrics');
         $metrics->assertOk();
@@ -87,7 +92,7 @@ final class RuntimeTest extends TestCase
 
         $this->getJson('/api/v1/stock-balances')->assertOk();
 
-        $this->assertLessThanOrEqual((int) config('operations.query_budget'), count(DB::getQueryLog()));
+        $this->assertLessThanOrEqual(ConfiguredInt::get('operations.query_budget', 15), count(DB::getQueryLog()));
         $this->assertTrue(Model::preventsLazyLoading());
     }
 

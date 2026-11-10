@@ -12,7 +12,7 @@ final class FindStop
 {
     public function execute(string $id): StopView
     {
-        $stop = DeliveryStop::query()->find($id);
+        $stop = DeliveryStop::query()->select(DeliveryStop::readColumns())->find($id);
 
         if ($stop === null) {
             throw new StopNotFound($id);

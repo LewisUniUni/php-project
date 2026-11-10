@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
+use App\Support\Eloquent\ReadsColumns;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -20,6 +21,12 @@ use Illuminate\Database\Eloquent\Model;
 final class StockBalance extends Model
 {
     use HasUuids;
+    use ReadsColumns;
+
+    public static function readColumns(): array
+    {
+        return ['id', 'sku_id', 'sku_code', 'location_id', 'location_code', 'on_hand', 'reserved', 'version', 'created_at', 'updated_at'];
+    }
 
     protected $fillable = [
         'sku_id',

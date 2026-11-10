@@ -23,3 +23,5 @@ Indexes created for this slice:
 | `audit_events (subject_type, subject_id)` and `created_at` | index | Audit lookup |
 
 An index is not evidence that a query is fast on a large table. Check the plan when the data grows.
+
+A universal cap of 100 rows was requested and not decided. The open choice is every read versus API list responses only. `tools/sql/row-cap.proposed.yml` records that choice and is not enforced. `COUNT(*)`, other aggregates, pagination counts, Eloquent relationship hydration, framework internals, and bounded batch jobs are not covered by that proposal. The delivery and balance list actions default to 100. The scan-event list defaults to 50. The outbox relay defaults to 50. `phpstan-dba` is not installed: its built-in rules cover PDO, mysqli, and Doctrine DBAL strings, and the open Laravel raw-query issue does not make a green run evidence about Eloquent.

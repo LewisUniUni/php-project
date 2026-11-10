@@ -33,7 +33,7 @@ Latest stable releases checked on 6 November 2026. The lockfile in this reposito
 | ext-redis | 6.3.0 (Nov 2025) | No newer stable release. | Loads on PHP 8.5.12. The image installs 6.3.0. |
 | league/openapi-psr7-validator | 0.24 | Describes itself as an OpenAPI 3.0.2 validator. | Not used. It is the wrong dialect for a 3.1 contract. |
 | OpenAPI contract tests | studio-design/gesso 2.9.0 | PHP `^8.3`, PHPUnit 12 or 13, OpenAPI 3.1 via opis/json-schema 2.6. | Locked. `gesso doctor` reported the spec as OpenAPI 3.1.0. |
-| OpenTelemetry PHP SDK / extension | SDK 1.16.1 does not require the C extension. PECL stable extension is 1.4.2. Ubuntu's `php8.5-opentelemetry` package is 1.2.1. | Auto-instrumentation under Octane was not verified. | Not installed. Logs carry a trace id. Spans are not exported. |
+| OpenTelemetry PHP SDK / extension | SDK 1.16.1 does not require the C extension. PECL stable extension is 1.4.2. Ubuntu's `php8.5-opentelemetry` package is 1.2.1. | Auto-instrumentation under Octane was not verified. | Not installed. Logs carry `trace_id` and `span_id`. OTLP export is opt-in and off by default. The visualization target is Grafana, not SigNoz. No collector endpoint is configured. |
 | ext-pdo_mysql | Bundled with PHP 8.5.12. | Ships with php-src. | Used. |
 
 ## Framework recommendation
@@ -160,7 +160,7 @@ Budgets are starting values. They are configurable. No static tool proves that S
 | Gate | Tool | Blocks a change? | This draft |
 | --- | --- | --- | --- |
 | Code style | Pint, Laravel preset | Yes | Runs on PHP 8.5.12 |
-| Static analysis | Larastan level 8, PHPStan strict-rules, deprecation rules | Yes | `staticMethod.dynamicCall` is excluded because it flags Eloquent's `__call` API. See `phpstan.neon`. |
+| Static analysis | Larastan level max, PHPStan strict-rules, deprecation rules, phpstan-phpunit | Yes | `staticMethod.dynamicCall` is excluded because it flags Eloquent's `__call` API. See `phpstan.neon`. The playbook adoption record is [engineering-playbook-adoption.md](engineering-playbook-adoption.md). |
 | Architecture | PHPat: no cross-module model access | Yes | Four rules |
 | Tests | PHPUnit against MySQL, two Redis processes, and MongoDB | Yes | 17 tests, real services |
 | SQL warnings | Strict MySQL mode, `Model::shouldBeStrict()`, query-count assertion | Yes | Default budget is 15 queries |
@@ -178,13 +178,13 @@ GitHub secret scanning and push protection are repository settings. Turn them on
 
 ## Observability
 
-Logs go to stderr as JSON through Monolog. A processor redacts passwords, secrets, tokens, authorization headers, cookies, and bearer strings. Laravel `Context` carries `request_id` and `trace_id` into the request. Jobs add `job_id` when the queue provides one. The trace id is read from a W3C `traceparent` header or generated. It is a log correlation id. It is not an exported OpenTelemetry span.
+Logs go to stderr as JSON through Monolog. A processor redacts passwords, secrets, tokens, authorization headers, cookies, and bearer strings. Laravel `Context` carries `request_id`, `trace_id`, and `span_id`. The web role reads both ids from a W3C `traceparent` header or generates them. The outbox consumer and the scheduler heartbeat do the same for their own log lines. Jobs add `job_id` when the queue provides one. These ids are log correlation. They are not exported OpenTelemetry spans. Grafana is the intended place to view telemetry once a collector exists. SigNoz is not the target. `TELEMETRY_EXPORT` stays false until `OTEL_EXPORTER_OTLP_ENDPOINT` names a collector the operator runs.
 
 Business audit rows (who changed stock) are inserted in the same MySQL transaction as the change. They are not log lines.
 
 `/metrics` is hand-written Prometheus text: an HTTP counter stored on the cache Redis, a pending-outbox gauge from MySQL, and the scheduler heartbeat age. Cache eviction can drop the counter. That is acceptable for a counter and is not how the queue is stored. Set `METRICS_TOKEN` outside local development and send it as a bearer token. The endpoint does not include DSNs or secrets.
 
-An optional Compose profile for Prometheus, Grafana, Loki, and an OpenTelemetry collector is not shipped. Those processes would not receive traces, because no exporter is installed. Horizon exposes its own metrics inside the dashboard, which requires an authenticated operator and is closed to anonymous users even when `APP_ENV=local`.
+Compose does not start Grafana, a collector, Loki, Tempo, Mimir, or Alloy. Those addresses are not invented here. Horizon exposes its own metrics inside the dashboard, which requires an authenticated operator and is closed to anonymous users even when `APP_ENV=local`.
 
 ## Deployment and operations
 

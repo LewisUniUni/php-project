@@ -1,0 +1,17 @@
+# The application-read decision is implemented in App\Support\Database\ReadCap.
+# This file is not loaded by CI. It lists package operations that the guard does
+# not see. They are not approved exemptions and there is no SQL allowlist.
+status: decision-applied-for-application-origin-reads
+max_result_rows: 100
+enforced:
+  - application-origin mysql select
+  - scan-event mongodb collection fetch
+not_a_database_read:
+  - redis
+  - filesystem
+  - mongodb ping command
+proposed_exceptions_not_enabled:
+  - eloquent-user-provider-login
+  - passport-oauth-client-and-token-hydration
+  - migrator-and-schema-metadata
+  - database-session-or-database-cache-if-those-drivers-are-selected

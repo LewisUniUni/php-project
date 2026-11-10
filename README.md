@@ -26,9 +26,10 @@ Host PHP must be 8.5 with `pdo_mysql`, `redis`, and `mongodb`. The test suite us
 
 ```bash
 composer install
+composer ci:static
 php artisan test
-composer lint
-composer analyse
 ```
+
+Coverage, mutation testing, and the decisions still open are recorded in [docs/engineering-playbook-adoption.md](docs/engineering-playbook-adoption.md).
 
 The HTTP contract is [docs/api/openapi.yaml](docs/api/openapi.yaml).

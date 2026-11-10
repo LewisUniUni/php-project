@@ -27,7 +27,7 @@ final class EnsurePlannedStop
             throw new InvalidOutboxPayload('Reservation payload quantity must be a positive integer.');
         }
 
-        $existing = DeliveryStop::query()->where('reference', $reference)->first();
+        $existing = DeliveryStop::query()->select(DeliveryStop::readColumns())->where('reference', $reference)->first();
 
         if ($existing !== null) {
             return $this->view($existing, true);
@@ -44,7 +44,7 @@ final class EnsurePlannedStop
                 'version' => 0,
             ]);
         } catch (UniqueConstraintViolationException) {
-            $stop = DeliveryStop::query()->where('reference', $reference)->firstOrFail();
+            $stop = DeliveryStop::query()->select(DeliveryStop::readColumns())->where('reference', $reference)->firstOrFail();
 
             return $this->view($stop, true);
         }

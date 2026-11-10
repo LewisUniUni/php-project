@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Outbox\Models;
 
 use App\Modules\Outbox\Enums\OutboxStatus;
+use App\Support\Eloquent\ReadsColumns;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,12 @@ use Illuminate\Support\Carbon;
 final class OutboxMessage extends Model
 {
     use HasUuids;
+    use ReadsColumns;
+
+    public static function readColumns(): array
+    {
+        return ['id', 'type', 'payload', 'status', 'attempts', 'leased_until', 'processed_at', 'last_error', 'created_at'];
+    }
 
     public const UPDATED_AT = null;
 

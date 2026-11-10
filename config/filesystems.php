@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+$appUrl = env('APP_URL', 'http://localhost');
+
 return [
 
     /*
@@ -41,7 +45,7 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            'url' => rtrim(is_string($appUrl) ? $appUrl : 'http://localhost', '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

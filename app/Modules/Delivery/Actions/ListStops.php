@@ -6,6 +6,7 @@ namespace App\Modules\Delivery\Actions;
 
 use App\Modules\Delivery\Data\StopView;
 use App\Modules\Delivery\Models\DeliveryStop;
+use App\Support\Database\ReadCap;
 
 final class ListStops
 {
@@ -14,7 +15,9 @@ final class ListStops
      */
     public function execute(int $limit = 100): array
     {
-        return DeliveryStop::query()
+        ReadCap::assertFetchSize($limit);
+
+        return DeliveryStop::query()->select(DeliveryStop::readColumns())
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()

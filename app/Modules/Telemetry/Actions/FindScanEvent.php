@@ -11,7 +11,7 @@ final class FindScanEvent
 {
     public function execute(string $eventId): ?ScanEventView
     {
-        $event = ScanEvent::query()->where('event_id', $eventId)->first();
+        $event = ScanEvent::query()->select(ScanEvent::readColumns())->where('event_id', $eventId)->first();
 
         if (! $event instanceof ScanEvent) {
             return null;

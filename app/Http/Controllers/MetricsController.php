@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Modules\Outbox\Actions\CountPendingMessages;
+use App\Support\Values\ConfiguredInt;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Throwable;
+use UnexpectedValueException;
 
 final class MetricsController
 {
@@ -36,12 +38,18 @@ final class MetricsController
                     if (! is_string($field)) {
                         continue;
                     }
+                    try {
+                        $count = ConfiguredInt::parse($value, 'quay:http_requests.'.$field);
+                    } catch (UnexpectedValueException) {
+                        continue;
+                    }
+
                     [$method, $status] = array_pad(explode('|', $field, 2), 2, 'unknown');
                     $lines[] = sprintf(
                         'quay_http_requests_total{method="%s",status="%s"} %d',
                         $this->label($method),
                         $this->label($status),
-                        (int) $value,
+                        $count,
                     );
                 }
             }

@@ -25,7 +25,7 @@ final class TransitionStop
     public function execute(string $stopId, StopStatus $next, Actor $actor): StopView
     {
         return DB::transaction(function () use ($stopId, $next, $actor): StopView {
-            $stop = DeliveryStop::query()->whereKey($stopId)->lockForUpdate()->first();
+            $stop = DeliveryStop::query()->select(DeliveryStop::readColumns())->whereKey($stopId)->lockForUpdate()->first();
 
             if ($stop === null) {
                 throw new StopNotFound($stopId);

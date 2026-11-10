@@ -12,7 +12,7 @@ final class RequireSku
 {
     public function execute(string $code): SkuRef
     {
-        $sku = Sku::query()->where('code', $code)->first();
+        $sku = Sku::query()->select(Sku::readColumns())->where('code', $code)->first();
 
         if ($sku === null) {
             throw UnknownCatalogItem::sku($code);

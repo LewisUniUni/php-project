@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Telemetry\Documents;
 
+use App\Support\Database\CappedMongoBuilder;
+use App\Support\Eloquent\ReadsColumns;
 use Illuminate\Support\Carbon;
 use MongoDB\Laravel\Eloquent\Model;
 
@@ -20,6 +22,8 @@ use MongoDB\Laravel\Eloquent\Model;
  */
 final class ScanEvent extends Model
 {
+    use ReadsColumns;
+
     protected $connection = 'mongodb';
 
     /** @var string */
@@ -28,6 +32,16 @@ final class ScanEvent extends Model
     public $timestamps = false;
 
     protected $guarded = [];
+
+    public static function readColumns(): array
+    {
+        return ['_id', 'event_id', 'device_id', 'symbology', 'payload', 'warehouse_code', 'recorded_at', 'device'];
+    }
+
+    public function newEloquentBuilder($query)
+    {
+        return new CappedMongoBuilder($query);
+    }
 
     /**
      * @return array<string, string>

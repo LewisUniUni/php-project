@@ -11,7 +11,7 @@ final class RegisterSku
 {
     public function execute(string $code, string $name, string $unit = 'each'): SkuRef
     {
-        $sku = Sku::query()->firstOrCreate(
+        $sku = Sku::query()->select(Sku::readColumns())->firstOrCreate(
             ['code' => $code],
             ['name' => $name, 'unit' => $unit],
         );

@@ -12,7 +12,7 @@ final class RequireLocation
 {
     public function execute(string $code): LocationRef
     {
-        $location = Location::query()->where('code', $code)->first();
+        $location = Location::query()->select(Location::readColumns())->where('code', $code)->first();
 
         if ($location === null) {
             throw UnknownCatalogItem::location($code);

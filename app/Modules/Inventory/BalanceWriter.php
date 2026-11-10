@@ -45,7 +45,7 @@ final class BalanceWriter
 
     public function lock(string $skuId, string $locationId): ?StockBalance
     {
-        return StockBalance::query()
+        return StockBalance::query()->select(StockBalance::readColumns())
             ->where('sku_id', $skuId)
             ->where('location_id', $locationId)
             ->lockForUpdate()

@@ -48,12 +48,13 @@ final class DeliverOutboxMessage implements ShouldQueue
         $jobId = $this->job?->getJobId();
         $context->replace(
             requestId: null,
-            traceId: null,
+            traceId: bin2hex(random_bytes(16)),
+            spanId: bin2hex(random_bytes(8)),
             jobId: is_string($jobId) ? $jobId : 'inline',
         );
         Log::withContext($context->logContext());
 
-        $message = OutboxMessage::query()->find($this->messageId);
+        $message = OutboxMessage::query()->select(OutboxMessage::readColumns())->find($this->messageId);
 
         if ($message === null || $message->status === OutboxStatus::Processed) {
             return;

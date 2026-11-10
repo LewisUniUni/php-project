@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Inventory\Data\BalanceView;
 use App\Modules\Inventory\Models\StockBalance;
+use App\Support\Database\ReadCap;
 
 final class ListBalances
 {
@@ -14,7 +15,9 @@ final class ListBalances
      */
     public function execute(int $limit = 100): array
     {
-        return StockBalance::query()
+        ReadCap::assertFetchSize($limit);
+
+        return StockBalance::query()->select(StockBalance::readColumns())
             ->orderBy('sku_code')
             ->orderBy('location_code')
             ->limit($limit)

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Delivery\Models;
 
 use App\Modules\Delivery\Enums\StopStatus;
+use App\Support\Eloquent\ReadsColumns;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,6 +22,12 @@ use Illuminate\Database\Eloquent\Model;
 final class DeliveryStop extends Model
 {
     use HasUuids;
+    use ReadsColumns;
+
+    public static function readColumns(): array
+    {
+        return ['id', 'reference', 'reservation_id', 'warehouse_code', 'sku_code', 'quantity', 'status', 'version', 'created_at', 'updated_at'];
+    }
 
     protected $fillable = [
         'reference',

@@ -25,7 +25,7 @@ final class ConsumeReservation
     public function execute(string $reservationId, Actor $actor): void
     {
         DB::transaction(function () use ($reservationId, $actor): void {
-            $reservation = Reservation::query()->whereKey($reservationId)->lockForUpdate()->first();
+            $reservation = Reservation::query()->select(Reservation::readColumns())->whereKey($reservationId)->lockForUpdate()->first();
 
             if ($reservation === null) {
                 throw new ReservationNotFound($reservationId);

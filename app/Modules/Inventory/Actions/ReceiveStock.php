@@ -33,7 +33,7 @@ final class ReceiveStock
         Actor $actor,
     ): ReceiptView {
         return DB::transaction(function () use ($skuCode, $locationCode, $quantity, $idempotencyKey, $actor): ReceiptView {
-            $existing = StockMovement::query()->where('idempotency_key', $idempotencyKey)->first();
+            $existing = StockMovement::query()->select(StockMovement::readColumns())->where('idempotency_key', $idempotencyKey)->first();
 
             if ($existing !== null) {
                 $balance = $this->balances->lock($existing->sku_id, $existing->location_id);

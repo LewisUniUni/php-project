@@ -20,6 +20,11 @@
 /public/storage
 /storage/*.key
 /storage/phpstan
+/storage/coverage/
+/storage/infection/
+/storage/phpmetrics/
+/tools/ci/bin/
+.phpmd.result-cache.php
 /agent-tools
 /frankenphp
 /public/frankenphp

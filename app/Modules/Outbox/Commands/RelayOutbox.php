@@ -7,6 +7,8 @@ namespace App\Modules\Outbox\Commands;
 use App\Modules\Outbox\Enums\OutboxStatus;
 use App\Modules\Outbox\Jobs\DeliverOutboxMessage;
 use App\Modules\Outbox\Models\OutboxMessage;
+use App\Support\Database\ReadCap;
+use App\Support\Values\ConfiguredInt;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +23,10 @@ final class RelayOutbox extends Command
     public function handle(): int
     {
         $ids = DB::transaction(function (): array {
-            $messages = OutboxMessage::query()
+            $batch = ConfiguredInt::get('operations.outbox_batch', 50);
+            ReadCap::assertFetchSize($batch);
+
+            $messages = OutboxMessage::query()->select(OutboxMessage::readColumns())
                 ->where(function ($query): void {
                     $query->where('status', OutboxStatus::Pending)
                         ->orWhere(function ($query): void {
@@ -30,14 +35,14 @@ final class RelayOutbox extends Command
                         });
                 })
                 ->orderBy('created_at')
-                ->limit((int) config('operations.outbox_batch', 50))
+                ->limit($batch)
                 ->lock('FOR UPDATE SKIP LOCKED')
                 ->get();
 
             $leased = [];
 
             foreach ($messages as $message) {
-                if ($message->attempts >= (int) config('operations.outbox_max_attempts', 10)) {
+                if ($message->attempts >= ConfiguredInt::get('operations.outbox_max_attempts', 10)) {
                     $message->status = OutboxStatus::Failed;
                     $message->last_error = 'relay attempts exhausted';
                     $message->save();
@@ -47,7 +52,7 @@ final class RelayOutbox extends Command
 
                 $message->status = OutboxStatus::Leased;
                 $message->attempts++;
-                $message->leased_until = now()->addSeconds((int) config('operations.outbox_lease_seconds', 60));
+                $message->leased_until = now()->addSeconds(ConfiguredInt::get('operations.outbox_lease_seconds', 60));
                 $message->save();
                 $leased[] = $message->id;
             }

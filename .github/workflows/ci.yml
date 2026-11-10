@@ -12,7 +12,103 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: "8.5"
+          extensions: mbstring, xml, curl, zip, bcmath, intl
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Entrypoint does not migrate
+        run: |
+          if grep -n "artisan migrate" docker/entrypoint.sh; then
+            echo "Container start must not run migrations."
+            exit 1
+          fi
+
+      - name: Validate Composer
+        run: composer validate --no-check-publish --strict
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Static gates
+        run: composer ci:static
+
+      - name: OpenAPI doctor
+        run: vendor/bin/gesso doctor --spec=docs/api/openapi.yaml
+
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@2.76.0 lint docs/api/openapi.yaml
+
+      - name: OpenAPI breaking diff
+        if: github.event_name == 'pull_request'
+        run: |
+          curl -fsSL -o /tmp/oasdiff.tar.gz https://github.com/oasdiff/oasdiff/releases/download/v1.35.0/oasdiff_1.35.0_linux_amd64.tar.gz
+          echo "a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140  /tmp/oasdiff.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/oasdiff.tar.gz -C /tmp oasdiff
+          if git cat-file -e "origin/${{ github.base_ref }}:docs/api/openapi.yaml"; then
+            git show "origin/${{ github.base_ref }}:docs/api/openapi.yaml" > /tmp/base-openapi.yaml
+            /tmp/oasdiff breaking /tmp/base-openapi.yaml docs/api/openapi.yaml
+          else
+            echo "Base spec is absent. Breaking diff is skipped for the commit that introduces it."
+          fi
+
+      - name: Route parity
+        run: php artisan gesso:routes --prefix=api/v1 --fail-on-undocumented --fail-on-unimplemented --exclude-openapi-path=/oauth/token --exclude-openapi-path=/ready
+
+      - name: Install pinned linters
+        run: sh tools/ci/install-pinned-tools.sh
+
+      - name: Install Python linters
+        run: python3 -m pip install --user -r tools/ci/requirements.txt
+
+      - name: actionlint
+        run: tools/ci/bin/actionlint
+
+      - name: hadolint
+        run: tools/ci/bin/hadolint Dockerfile
+
+      - name: SQLFluff
+        run: python3 -m sqlfluff lint docker
+
+      - name: Semgrep
+        run: |
+          export PATH="${HOME}/.local/bin:${PATH}"
+          semgrep scan --config .semgrep/sql-policy.yml --error --metrics=off
+          semgrep scan --config .semgrep/ai-smells.yml --error --metrics=off app
+
+      - name: Fetch diff base
+        run: git fetch origin main
+
+      - name: Guardrails
+        env:
+          GUARD_BASE: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+        run: |
+          php tools/Guardrails/suppressions.php "$GUARD_BASE"
+          php tools/Guardrails/test-changes.php "$GUARD_BASE"
+          php tools/Guardrails/packages.php "$GUARD_BASE"
+          php tools/Guardrails/pr-size.php "$GUARD_BASE"
+          php tools/Guardrails/changed-files.php pint "$GUARD_BASE"
+          php tools/Guardrails/changed-files.php phpstan "$GUARD_BASE"
+
+  tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -78,64 +174,140 @@ jobs:
         with:
           php-version: "8.5"
           extensions: mbstring, xml, curl, zip, bcmath, intl, pdo_mysql, redis-6.3.0, mongodb-2.5.7
-          coverage: none
+          coverage: pcov
           tools: composer:v2
-
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "22"
-
-      - name: Entrypoint does not migrate
-        run: |
-          if grep -n "artisan migrate" docker/entrypoint.sh; then
-            echo "Container start must not run migrations."
-            exit 1
-          fi
-
-      - name: Validate Composer
-        run: composer validate --no-check-publish --strict
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Composer audit
-        run: composer audit --locked
+      - name: Install Semgrep for smell fixtures
+        run: python3 -m pip install --user -r tools/ci/requirements.txt
 
-      - name: Pint
-        run: vendor/bin/pint --test
-
-      - name: PHPStan
-        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
-
-      - name: OpenAPI doctor
-        run: vendor/bin/gesso doctor --spec=docs/api/openapi.yaml
-
-      - name: OpenAPI lint
-        run: npx --yes @redocly/cli@2.76.0 lint docs/api/openapi.yaml
-
-      - name: OpenAPI breaking diff
-        if: github.event_name == 'pull_request'
-        run: |
-          curl -fsSL -o /tmp/oasdiff.tar.gz https://github.com/oasdiff/oasdiff/releases/download/v1.35.0/oasdiff_1.35.0_linux_amd64.tar.gz
-          echo "a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140  /tmp/oasdiff.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/oasdiff.tar.gz -C /tmp oasdiff
-          if git cat-file -e "origin/${{ github.base_ref }}:docs/api/openapi.yaml"; then
-            git show "origin/${{ github.base_ref }}:docs/api/openapi.yaml" > /tmp/base-openapi.yaml
-            /tmp/oasdiff breaking /tmp/base-openapi.yaml docs/api/openapi.yaml
-          else
-            echo "Base spec is absent. Breaking diff is skipped for the commit that introduces it."
-          fi
-
-      - name: Route parity
-        run: php artisan gesso:routes --prefix=api/v1 --fail-on-undocumented --fail-on-unimplemented --exclude-openapi-path=/oauth/token --exclude-openapi-path=/ready
-
-      - name: Tests
+      - name: Unit coverage
         env:
-          # Collision truncates failure reasons to the terminal width (80 on runners).
           COLUMNS: "250"
-        # phpunit.xml supplies the test configuration. An empty .env stops phpdotenv's
-        # suppressed "file_get_contents(.env)" warning from flagging every feature test.
+        run: |
+          touch .env
+          mkdir -p storage/coverage storage/infection
+          composer test:coverage-unit
+
+      - name: Combined coverage
+        env:
+          COLUMNS: "250"
+        run: composer test:coverage
+
+      - name: Coverage summaries
+        run: composer coverage:summary
+
+      - name: Fetch diff base
+        run: git fetch origin main
+
+      - name: Diff coverage report
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: composer coverage:diff
+
+      - name: Infection
+        run: composer infection
+
+      - name: Upload coverage and mutation reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            storage/coverage/
+            storage/infection/
+          if-no-files-found: warn
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install pinned gitleaks
+        run: sh tools/ci/install-pinned-tools.sh
+
+      - name: gitleaks
+        run: tools/ci/bin/gitleaks detect --source . --no-banner --redact --exit-code 1
+
+  prefer-lowest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4.13@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+        env:
+          MYSQL_ROOT_PASSWORD: local-root-password
+          MYSQL_DATABASE: logistics_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -plocal-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      redis-cache:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      redis-queue:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      mongodb:
+        image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_USERNAME: root
+      DB_PASSWORD: local-root-password
+      DB_DATABASE: logistics_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: "8.5"
+          extensions: mbstring, xml, curl, zip, bcmath, intl, pdo_mysql, redis-6.3.0, mongodb-2.5.7
+          coverage: none
+          tools: composer:v2
+
+      - name: Install lowest allowed dependencies
+        run: composer update --prefer-lowest --prefer-stable --no-interaction --no-progress
+
+      - name: Install Semgrep for smell fixtures
+        run: python3 -m pip install --user -r tools/ci/requirements.txt
+
+      - name: Test lowest allowed dependencies
+        env:
+          COLUMNS: "250"
         run: |
           touch .env
           php artisan test
@@ -143,6 +315,60 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.4.13@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+        env:
+          MYSQL_ROOT_PASSWORD: local-root-password
+          MYSQL_DATABASE: logistics_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -plocal-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      redis-cache:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      redis-queue:
+        image: redis:8.10.3@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      mongodb:
+        image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_DATABASE: logistics_test
+      DB_USERNAME: root
+      DB_PASSWORD: local-root-password
+      REDIS_CACHE_HOST: 127.0.0.1
+      REDIS_CACHE_PORT: "6379"
+      REDIS_QUEUE_HOST: 127.0.0.1
+      REDIS_QUEUE_PORT: "6380"
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_DATABASE: logistics_test
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,14 +402,36 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk code test --severity-threshold=high
 
+      - name: Build runtime image
+        run: docker build -t quay-platform:ci .
+
+      - name: Verify FrankenPHP image
+        run: sh tools/frankenphp/verify-image.sh quay-platform:ci
+
       - name: Snyk Container
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker build -t quay-platform:ci .
-          snyk container test quay-platform:ci --file=Dockerfile --severity-threshold=high
+        run: snyk container test quay-platform:ci --file=Dockerfile --severity-threshold=high
 
       - name: Snyk IaC
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk iac test Dockerfile compose.yaml --severity-threshold=high
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          vulnerability-check: true
+          license-check: false
+          fail-on-severity: high
+          fail-on-scopes: runtime,development
