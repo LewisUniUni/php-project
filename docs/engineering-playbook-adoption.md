@@ -23,7 +23,7 @@ Host PHP for coverage and Infection was Ubuntu's PHP 8.5.12 with PCOV 1.0.12, re
 | `php tools/Guardrails/suppressions.php origin/main` | Passed. Exit 0 |
 | `php tools/Guardrails/test-changes.php origin/main` | Exit 0. Printed suspected assertion-line removals in `RuntimeTest` and `RedactSecretsProcessorTest`. No production path is approved, so the command does not fail |
 | `php tools/Guardrails/packages.php origin/main` | Exit 0. Eleven new direct packages returned HTTP 200 from Packagist. The output says a found package is not a trust decision |
-| `php tools/Guardrails/pr-size.php origin/main` | Exit 0. 15079 changed lines (13161 insertions, 1918 deletions, 173 files) against the merge base. No threshold |
+| `php tools/Guardrails/pr-size.php origin/main` | Exit 0. At `0c533ef`, 16370 changed lines (14452 insertions, 1918 deletions, 192 files). No threshold. The count includes the generated Boost files and lockfile growth already on this branch |
 | `php tools/Guardrails/changed-files.php pint origin/main` | Passed |
 | `php tools/Guardrails/changed-files.php phpstan origin/main` | Passed after the changed PHP files were made valid under the project rules. The command prints that this is not the full gate |
 | `semgrep --config .semgrep/ai-smells.yml --error app` | 0 findings on 96 tracked files. The same rules find 4 findings in the fail fixtures and 0 in the pass fixture |
