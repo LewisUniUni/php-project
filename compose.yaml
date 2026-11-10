@@ -66,6 +66,11 @@ services:
 
   mongodb:
     image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    environment:
+      # Lets MongoDB 8.0.34 start on Linux 6.19+ kernels (Ubuntu 7.0 HWE, GitHub runners).
+      # Remove once mongo 8.0.37 (SERVER-131779) is published and pinned.
+      # https://jira.mongodb.org/browse/SERVER-131779 https://jira.mongodb.org/browse/SERVER-121912
+      GLIBC_TUNABLES: glibc.pthread.rseq=1
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
