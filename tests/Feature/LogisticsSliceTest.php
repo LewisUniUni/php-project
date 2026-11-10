@@ -104,7 +104,7 @@ final class LogisticsSliceTest extends TestCase
         ], $this->idempotency())->assertCreated();
         Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 5]);
 
-        $stopId = (string) DeliveryStop::query()->where('reference', 'DEL-2002')->firstOrFail()->id;
+        $stopId = DeliveryStop::query()->where('reference', 'DEL-2002')->firstOrFail()->id;
 
         foreach (['dispatched', 'in_transit', 'delivered'] as $status) {
             $response = $this->postJson('/api/v1/delivery-stops/'.$stopId.'/transitions', [
@@ -141,8 +141,7 @@ final class LogisticsSliceTest extends TestCase
     {
         $this->seedCatalog();
         $client = $this->client(['inventory.read'], 'warehouse-api');
-        $client->secret = 'local-warehouse-client-secret';
-        $client->save();
+        $client->forceFill(['secret' => 'local-warehouse-client-secret'])->save();
 
         $token = $this->post('/oauth/token', [
             'grant_type' => 'client_credentials',
@@ -153,8 +152,11 @@ final class LogisticsSliceTest extends TestCase
         $token->assertOk();
         $this->assertResponseMatchesOpenApiSchema($token);
 
+        $accessToken = $token->json('access_token');
+        $this->assertIsString($accessToken);
+
         $this->flushHeaders();
-        $this->withToken((string) $token->json('access_token'))
+        $this->withToken($accessToken)
             ->getJson('/api/v1/stock-balances')
             ->assertOk();
     }

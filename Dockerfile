@@ -5,6 +5,11 @@ FROM dunglas/frankenphp:1.13.5-php8.5.12-trixie@sha256:7e73a27eb7712a5b4073b92f8
 ARG COMPOSER_VERSION=2.11.1
 ARG COMPOSER_SHA256=6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# ca-certificates and curl are not version-pinned. The base image is already
+# digest-pinned, and Snyk Container remains the CVE gate for the OS packages.
+# hadolint ignore=DL3008
 RUN install-php-extensions \
         bcmath \
         intl \

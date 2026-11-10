@@ -1,6 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Str;
+
+$appName = env('APP_NAME', 'laravel');
 
 return [
 
@@ -69,7 +73,7 @@ return [
 
     'prefix' => env(
         'HORIZON_PREFIX',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_horizon:'
+        Str::slug(is_string($appName) ? $appName : 'laravel', '_').'_horizon:'
     ),
 
     /*

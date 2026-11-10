@@ -19,6 +19,7 @@ use App\Modules\Inventory\Actions\ReleaseReservation;
 use App\Modules\Inventory\Actions\ReserveStock;
 use App\Modules\Telemetry\Actions\ListScanEvents;
 use App\Support\Actor;
+use App\Support\Values\Identifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -108,7 +109,7 @@ final class WarehouseController extends Controller
         $user = $request->user();
 
         if ($user instanceof User) {
-            return new Actor('user', (string) $user->getAuthIdentifier());
+            return new Actor('user', Identifier::string($user->getAuthIdentifier()));
         }
 
         return $actors->fromRequest($request);

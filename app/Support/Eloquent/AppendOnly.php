@@ -10,6 +10,9 @@ trait AppendOnly
 {
     public function update(array $attributes = [], array $options = [])
     {
+        // The signature matches Eloquent. The arguments are not applied.
+        unset($attributes, $options);
+
         throw new LogicException(static::class.' records are append-only.');
     }
 

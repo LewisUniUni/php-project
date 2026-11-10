@@ -28,9 +28,12 @@ final class RedactSecretsProcessorTest extends TestCase
 
         $processed = $processor($record);
 
+        $note = $processed->context['note'] ?? null;
+
         $this->assertSame('[redacted]', $processed->context['password']);
         $this->assertSame('[redacted]', $processed->context['client_secret']);
-        $this->assertStringContainsString('Bearer [redacted]', (string) $processed->context['note']);
-        $this->assertStringNotContainsString('abc.def.ghi', (string) $processed->context['note']);
+        $this->assertIsString($note);
+        $this->assertStringContainsString('Bearer [redacted]', $note);
+        $this->assertStringNotContainsString('abc.def.ghi', $note);
     }
 }

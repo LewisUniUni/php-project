@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="../../vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="../../vendor/autoload.php"
+         executionOrder="default"
+         cacheDirectory="../../storage/infection/phpunit-cache"
+         failOnDeprecation="true"
+         failOnNotice="true"
+         failOnRisky="true"
+         failOnWarning="true"
+>
+    <!--
+        Infection copies this file into its temp directory. The main phpunit.xml
+        boots Gesso, which looks for gesso.php beside that copy and then aborts.
+        This file is only the mutation-testing suite.
+    -->
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>../../tests/Unit</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>../../app/Modules/Delivery/Enums</directory>
+            <directory>../../app/Support/Logging</directory>
+            <directory>../../app/Support/Values</directory>
+        </include>
+    </source>
+</phpunit>

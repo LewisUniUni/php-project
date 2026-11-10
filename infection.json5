@@ -1,0 +1,21 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "app/Modules/Delivery/Enums",
+            "app/Support/Logging",
+            "app/Support/Values"
+        ]
+    },
+    "timeout": 10,
+    "phpUnit": {
+        "configDir": "tools/infection"
+    },
+    "logs": {
+        "text": "storage/infection/infection.log",
+        "summaryJson": "storage/infection/summary.json"
+    },
+    "mutators": {
+        "@default": true
+    }
+}

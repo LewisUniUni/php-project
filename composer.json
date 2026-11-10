@@ -1,12 +1,15 @@
 {
-    "$schema": "https://getcomposer.org/schema.json",
     "name": "quay/platform",
-    "type": "project",
     "description": "Quay logistics platform: warehouse inventory, reservations, and delivery state.",
-    "keywords": ["laravel", "logistics", "warehouse"],
     "license": "MIT",
+    "type": "project",
+    "keywords": [
+        "laravel",
+        "logistics",
+        "warehouse"
+    ],
     "require": {
-        "php": "8.5.*",
+        "php": "~8.5.0",
         "ext-mongodb": "^2.5",
         "ext-pcntl": "*",
         "ext-pdo": "*",
@@ -19,20 +22,33 @@
         "mongodb/laravel-mongodb": "^5.12"
     },
     "require-dev": {
+        "captainhook/captainhook": "^5.29",
+        "driftingly/rector-laravel": "^2.7",
+        "ergebnis/composer-normalize": "^2.56",
         "fakerphp/faker": "^1.23",
+        "giorgiosironi/eris": "^1.3",
+        "infection/infection": "^0.35.10",
         "larastan/larastan": "^3.14",
+        "laravel/boost": "^2.10",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
+        "php-parallel-lint/php-parallel-lint": "^1.4",
         "phpat/phpat": "^0.12",
+        "phpmd/phpmd": "^3.0",
         "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.1",
         "phpstan/phpstan-strict-rules": "^2.1",
         "phpunit/phpunit": "^12.5.12",
+        "rector/rector": "^2.8",
+        "roave/security-advisories": "dev-latest",
         "studio-design/gesso": "^2.9",
         "symfony/yaml": "^8.1"
     },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "App\\": "app/",
@@ -42,34 +58,39 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "Quay\\Tools\\": "tools/",
             "Tests\\": "tests/"
         }
     },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true,
+            "infection/extension-installer": true,
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        },
+        "optimize-autoloader": true,
+        "platform": {
+            "php": "8.5.12"
+        },
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
     "scripts": {
-        "setup": [
-            "composer install",
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install --ignore-scripts",
-            "npm run build"
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
-        "dev": [
-            "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ],
-        "test": [
-            "@php artisan config:clear --ansi @no_additional_args",
-            "@php artisan test"
-        ],
-        "lint": "pint --test",
-        "analyse": "phpstan analyse --memory-limit=1G --no-progress",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
-        ],
-        "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
@@ -79,24 +100,46 @@
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
-        "pre-package-uninstall": [
-            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-        ]
+        "analyse": "phpstan analyse --memory-limit=1G --no-progress",
+        "audit:locked": "composer audit --locked --abandoned=report",
+        "ci:static": [
+            "@lint:syntax",
+            "@lint",
+            "@analyse",
+            "@phpmd",
+            "@normalize:check",
+            "@audit:locked"
+        ],
+        "coverage:diff": "@php tools/Coverage/diff-coverage.php storage/coverage/combined.clover storage/coverage/diff-coverage.md",
+        "coverage:summary": [
+            "@php tools/Coverage/summarize.php storage/coverage/unit.clover storage/coverage/unit-summary.md app",
+            "@php tools/Coverage/summarize.php storage/coverage/combined.clover storage/coverage/combined-summary.md app"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan dev"
+        ],
+        "infection": "@php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/infection run --threads=4 --logger-text=storage/infection/infection.log --logger-summary-json=storage/infection/summary.json --test-framework-extra-args=\"--filter=StopStatus|RedactSecrets|ConfiguredInt|ConfiguredString|Identifier\"",
+        "lint": "pint --test",
+        "lint:syntax": "parallel-lint --exclude vendor --exclude node_modules --exclude storage --exclude bootstrap/cache app bootstrap config database public routes tests tools gesso.php",
+        "normalize:check": "composer normalize --dry-run",
+        "phpmd": "phpmd analyze app tests --format ansi --ruleset phpmd.xml --no-progress",
+        "rector": "rector process --dry-run --no-progress-bar",
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install --ignore-scripts",
+            "npm run build"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan test"
+        ],
+        "test:coverage": "@php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/phpunit --coverage-clover storage/coverage/combined.clover --coverage-text",
+        "test:coverage-unit": "@php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/phpunit --testsuite=Unit --coverage-clover storage/coverage/unit.clover --coverage-text",
+        "test:unit": "@php artisan test --testsuite=Unit"
     },
-    "extra": {
-        "laravel": {
-            "dont-discover": []
-        }
-    },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true,
-            "php-http/discovery": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+    "$schema": "https://getcomposer.org/schema.json"
 }

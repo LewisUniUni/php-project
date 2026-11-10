@@ -160,7 +160,7 @@ Budgets are starting values. They are configurable. No static tool proves that S
 | Gate | Tool | Blocks a change? | This draft |
 | --- | --- | --- | --- |
 | Code style | Pint, Laravel preset | Yes | Runs on PHP 8.5.12 |
-| Static analysis | Larastan level 8, PHPStan strict-rules, deprecation rules | Yes | `staticMethod.dynamicCall` is excluded because it flags Eloquent's `__call` API. See `phpstan.neon`. |
+| Static analysis | Larastan level max, PHPStan strict-rules, deprecation rules, phpstan-phpunit | Yes | `staticMethod.dynamicCall` is excluded because it flags Eloquent's `__call` API. See `phpstan.neon`. The playbook adoption record is [engineering-playbook-adoption.md](engineering-playbook-adoption.md). |
 | Architecture | PHPat: no cross-module model access | Yes | Four rules |
 | Tests | PHPUnit against MySQL, two Redis processes, and MongoDB | Yes | 17 tests, real services |
 | SQL warnings | Strict MySQL mode, `Model::shouldBeStrict()`, query-count assertion | Yes | Default budget is 15 queries |

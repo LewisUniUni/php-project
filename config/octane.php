@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Support\Runtime\CorrelationContext;
 use App\Support\Runtime\ResetWorkerRequestState;
 use Laravel\Octane\Contracts\OperationTerminated;
