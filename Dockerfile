@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM dunglas/frankenphp:1.13.5-php8.5.12-trixie@sha256:7e73a27eb7712a5b4073b92f8f0dec91e9400138604b76cc791589faaa6a639c AS php-base
+FROM dunglas/frankenphp:1.13.5-php8.5.12-trixie@sha256:667c5fffd348d9c3c260803d75956f1d9aace7e4b7331d8893de6f101d7e0e57 AS php-base
 
 ARG COMPOSER_VERSION=2.11.1
 ARG COMPOSER_SHA256=6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c
